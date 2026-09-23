@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "io.github.yuwengueen.dbx-code-editor",
   "name": "Code Editor",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "publisher": "yuwengueen",
   "description": "A lightweight local project code editor inside DBX.",
   "icon": "assets/plugin.svg",

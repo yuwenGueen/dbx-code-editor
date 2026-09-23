@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	dbxpluginsdk "github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk"
@@ -26,7 +27,7 @@ func TestDraftsPersistAndDelete(t *testing.T) {
 		t.Fatalf("saved draft should be readable: %#v, %v", listed, err)
 	}
 	info, err := os.Stat(filepath.Join(store.dir, draft.ID+".json"))
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatalf("draft should be private: %v, %v", info, err)
 	}
 	draft.Content = "edited note\n"
@@ -111,7 +112,9 @@ func TestDraftListingPaginatesWithoutDroppingTabs(t *testing.T) {
 
 func TestEditorPreferencesPersist(t *testing.T) {
 	store := &draftStore{dir: filepath.Join(t.TempDir(), "drafts")}
-	want := editorPreferences{RecentFolders: []string{"/tmp/project-a", "/tmp/project-b"}, RecentPositions: []filePosition{{Path: "/tmp/project-a/readme.txt", Selection: 123, ScrollTop: 456}}, Session: editorSession{WorkspacePath: "/tmp/project-a", OpenFiles: []string{"readme.txt"}, ActiveFile: "readme.txt", ActiveDraft: "draft-12345678"}, Theme: "dark", EditorFont: "menlo", EditorFontSize: 15}
+	projectA := filepath.Join(t.TempDir(), "project-a")
+	projectB := filepath.Join(t.TempDir(), "project-b")
+	want := editorPreferences{RecentFolders: []string{projectA, projectB}, RecentPositions: []filePosition{{Path: filepath.Join(projectA, "readme.txt"), Selection: 123, ScrollTop: 456}}, Session: editorSession{WorkspacePath: projectA, OpenFiles: []string{"readme.txt"}, ActiveFile: "readme.txt", ActiveDraft: "draft-12345678"}, Theme: "dark", EditorFont: "menlo", EditorFontSize: 15}
 	if err := store.savePreferences(want); err != nil {
 		t.Fatal(err)
 	}
