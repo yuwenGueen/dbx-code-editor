@@ -623,15 +623,35 @@ function changeEditorFontSize(amount: number) {
   queuePreferencesSave();
 }
 
+function normalizedLocalPath(path: string): string {
+  const slashPath = path.replace(/\\/g, "/");
+  return slashPath === "/" || /^[A-Za-z]:\/$/.test(slashPath) ? slashPath : slashPath.replace(/\/+$/, "");
+}
+
+function localPathKey(path: string): string {
+  const normalized = normalizedLocalPath(path);
+  return /^[A-Za-z]:\//.test(normalized) || normalized.startsWith("//") ? normalized.toLowerCase() : normalized;
+}
+
+function relativePathInFolder(file: string, folder: string): string | null {
+  const normalizedFile = normalizedLocalPath(file);
+  const normalizedFolder = normalizedLocalPath(folder);
+  const prefix = normalizedFolder.endsWith("/") ? normalizedFolder : normalizedFolder + "/";
+  const keyPrefix = localPathKey(normalizedFolder).endsWith("/") ? localPathKey(normalizedFolder) : localPathKey(normalizedFolder) + "/";
+  return localPathKey(normalizedFile).startsWith(keyPrefix) ? normalizedFile.slice(prefix.length) : null;
+}
+
 function absolutePathForTab(tab: EditorTab): string | null {
   if (!workspace || tab.untitled) return null;
-  return workspace.singleFile ? workspace.path : workspace.path.replace(/\/$/, "") + "/" + tab.path;
+  if (workspace.singleFile) return normalizedLocalPath(workspace.path);
+  const folder = normalizedLocalPath(workspace.path);
+  return (folder.endsWith("/") ? folder : folder + "/") + tab.path;
 }
 
 function rememberFilePosition(tab: EditorTab) {
   const path = absolutePathForTab(tab);
   if (!path) return;
-  recentPositions = [{ path, selection: tab.selection, scrollTop: Math.round(tab.scrollTop) }, ...recentPositions.filter((item) => item.path !== path)].slice(0, 20);
+  recentPositions = [{ path, selection: tab.selection, scrollTop: Math.round(tab.scrollTop) }, ...recentPositions.filter((item) => localPathKey(item.path) !== localPathKey(path))].slice(0, 20);
   window.clearTimeout(positionSaveTimer);
   positionSaveTimer = window.setTimeout(queuePreferencesSave, 450);
 }
@@ -1397,14 +1417,17 @@ async function openFile(node: Entry, encoding = "") {
     const result = await readDocument(currentWorkspace, node.path, encoding);
     if (workspace !== currentWorkspace) return;
     if (tabs.some((tab) => tab.path === node.path)) { activateTab(node.path); return; }
-    const absolutePath = currentWorkspace.singleFile ? currentWorkspace.path : currentWorkspace.path.replace(/\/$/, "") + "/" + node.path;
-    const position = recentPositions.find((item) => item.path === absolutePath);
+    const absolutePath = currentWorkspace.singleFile ? normalizedLocalPath(currentWorkspace.path) : (() => {
+      const folder = normalizedLocalPath(currentWorkspace.path);
+      return (folder.endsWith("/") ? folder : folder + "/") + node.path;
+    })();
+    const position = recentPositions.find((item) => localPathKey(item.path) === localPathKey(absolutePath));
     tabs.push({ name: node.name, path: node.path, content: result.content, savedContent: result.content, revision: result.revision, encoding: result.encoding, dirty: false, selection: Math.min(position?.selection ?? 0, result.content.length), scrollTop: position?.scrollTop ?? 0, languageId: detectLanguage(node.name, result.content), languageAuto: true });
     activePath = node.path;
     recentTabs = [node.path, ...recentTabs.filter((item) => item !== node.path)];
     hideNotice();
     pendingEncodingEntry = null;
-    recentFiles = [absolutePath, ...recentFiles.filter((item) => item !== absolutePath)].slice(0, 8);
+    recentFiles = [absolutePath, ...recentFiles.filter((item) => localPathKey(item) !== localPathKey(absolutePath))].slice(0, 8);
     queuePreferencesSave();
     renderTabs();
     renderTree();
@@ -1600,11 +1623,11 @@ async function restoreSavedSession(saved?: SavedSession) {
   let session = saved;
   if (!session?.workspacePath && recentFiles.length) {
     const path = recentFiles[0];
-    const folder = recentFolders.find((item) => path.startsWith(item.replace(/\/$/, "") + "/"));
+    const folder = recentFolders.find((item) => relativePathInFolder(path, item) !== null);
     session = folder ? {
       workspacePath: folder, singleFile: false,
-      openFiles: [path.slice(folder.replace(/\/$/, "").length + 1)],
-      activeFile: path.slice(folder.replace(/\/$/, "").length + 1), activeDraft: ""
+      openFiles: [relativePathInFolder(path, folder)!],
+      activeFile: relativePathInFolder(path, folder)!, activeDraft: ""
     } : { workspacePath: path, singleFile: true, openFiles: [], activeFile: "", activeDraft: "" };
   }
   if (!session?.workspacePath) return;
@@ -1701,8 +1724,8 @@ async function chooseFile() {
   if (selected.busy) return;
   try {
     if (selected.cancelled || !selected.path) return;
-    if (workspace && !workspace.singleFile && selected.path.startsWith(workspace.path.replace(/\/$/, "") + "/")) {
-      const relative = selected.path.slice(workspace.path.replace(/\/$/, "").length + 1);
+    const relative = workspace && !workspace.singleFile ? relativePathInFolder(selected.path, workspace.path) : null;
+    if (relative !== null) {
       await openFile({ name: relative.split("/").pop() ?? relative, path: relative, kind: "file", size: 0 });
       return;
     }

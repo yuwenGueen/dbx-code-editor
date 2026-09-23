@@ -3,10 +3,30 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	dbxpluginsdk "github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk"
 )
+
+func TestPickerCommandsUseNativeDialogs(t *testing.T) {
+	for _, test := range []struct {
+		platform string
+		kind     string
+		command  string
+		contains string
+	}{
+		{"darwin", "file", "/usr/bin/osascript", "choose file"},
+		{"darwin", "folder", "/usr/bin/osascript", "choose folder"},
+		{"windows", "file", "powershell.exe", "OpenFileDialog"},
+		{"windows", "folder", "powershell.exe", "FolderBrowserDialog"},
+	} {
+		command, args, err := pickerCommand(test.platform, test.kind)
+		if err != nil || command != test.command || !strings.Contains(strings.Join(args, " "), test.contains) {
+			t.Fatalf("%s %s: command %q, args %q, error %v", test.platform, test.kind, command, args, err)
+		}
+	}
+}
 
 func testWorkspace(t *testing.T, root string) (*plugin, string) {
 	t.Helper()

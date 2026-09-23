@@ -1,0 +1,17 @@
+{
+  "name": "Code Editor",
+  "description": "Browse, search, and edit local project files inside DBX.",
+  "icon": "assets/plugin.svg",
+  "tags": ["editor", "files", "developer-tools"],
+  "permissions": ["host.storage"],
+  "source": "https://github.com/yuwenGueen/dbx-code-editor",
+  "homepage": "https://github.com/yuwenGueen/dbx-code-editor",
+  "license": "Apache-2.0",
+  "releaseNotes": "Initial Code Editor release for macOS, Windows, and Linux: project explorer, multi-tab editing, saved temporary drafts, project search, syntax modes, encoding selection, and Markdown preview.",
+  "localizations": {
+    "zh-CN": {
+      "name": "Code Editor",
+      "description": "在 DBX 中浏览、搜索和编辑本地项目文件。"
+    }
+  }
+}

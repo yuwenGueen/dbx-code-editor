@@ -1,0 +1,20 @@
+name: Release DBX plugin
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: t8y2/dbx/.github/workflows/plugin-release-reusable.yml@8897e12714879e07f684a20d1533763586f48329
+    with:
+      release-tag: ${{ github.event.release.tag_name }}
+      package-command: npm ci && npm run check && (cd backend && go test ./...) && npm run plugin:package
+      package-path: dist/*.dbxp
+      metadata-path: dist/*.artifact.json
+      plugin-cli-version: 0.1.9
+      rust-toolchain: ''
+      build-matrix: '{"include":[{"runner":"macos-15-intel","target":"darwin-x64"},{"runner":"macos-15","target":"darwin-arm64"},{"runner":"windows-2022","target":"windows-x64"},{"runner":"ubuntu-24.04","target":"linux-x64"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64"}]}'

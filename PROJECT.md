@@ -1,46 +1,29 @@
-# 项目信息：DBX Code Editor
+# 项目信息：Code Editor for DBX
 
 ## 定位
 
-DBX Code Editor 是 DBX 的轻量代码编辑器插件。它让需要同时处理数据库、SQL 脚本、迁移文件和项目配置的用户，在 DBX 里完成常见的本地文本编辑。
+在 DBX 桌面工作台中提供本地项目文件编辑能力。当前已实现项目树、多标签、临时草稿、语法模式、Markdown 预览、文件与项目搜索、会话恢复，以及保存前的外部修改检测。发布工作流构建 macOS、Windows 和 Linux 桌面包。
 
-## 首版目标
+## 结构
 
-在 DBX 桌面版中安装插件后，用户可以输入一个本地目录路径，浏览文件树，打开多个文本文件，编辑并保存。界面优先保证清晰、响应快、键盘操作顺手。
+- `frontend/`：TypeScript、Vite、CodeMirror 6 的工作台界面。
+- `backend/`：Go Sidecar，通过 DBX JSON-RPC 桥接读取和保存用户选定的本地文件。
+- `manifest.json`：插件身份、工作台、Sidecar 与 `host.storage` 权限。
+- `assets/`：插件图标。
+- `ui/`：构建输出；由 `npm run build` 生成，不手工修改或提交。
+- `dist/`：未签名 `.dbxp` 及元数据；由插件 CLI 生成，不提交。
 
-### 首版功能
+Sidecar 只为已打开的文件或项目目录建立访问范围；项目搜索跳过符号链接。保存请求携带原始文件修订值，发现外部修改时拒绝覆盖，写入同目录临时文件后替换。macOS 选择器通过 `/usr/bin/osascript` 调用，Windows 使用 PowerShell 的系统对话框，Linux 使用 `zenity` 或 `kdialog`；重复的选择请求会被忽略。
 
-1. 打开一个本地文件夹；在文件树中按需展开子目录。
-2. 多标签打开 UTF-8 文本文件，提供常见语言的语法高亮和文件内搜索。
-3. 显示未保存状态，支持快捷键保存；关闭或切换目录时保护未保存编辑。
-4. 保存时检查文件是否在外部改变，避免静默覆盖；保存采用同目录临时文件替换。
-5. 记住上次目录，跟随 DBX 明暗主题，提供中英文界面。
+草稿和编辑器偏好存放在用户配置目录的 `io.github.yuwengueen.dbx-code-editor/drafts/`；项目文件仍保存在用户选定的原路径。插件不访问网络或 DBX 的数据库连接。
 
-### 当前边界
+## 当前边界
 
-- 只处理本地文件夹内的现有文本文件，单文件上限 2 MiB。
-- 首版通过路径输入打开目录；暂不提供原生目录选择器。
-- 暂不提供新建、重命名、删除文件，以及终端、Git、LSP、远程文件或 AI 功能。
-- 符号链接显示在文件树中，但首版不打开它们。
-- 插件面向桌面端；Web 部署中的 Sidecar 文件系统属于服务端，不等于浏览器所在电脑。
+- 现有文件上限 32 MiB；临时草稿上限 1 MiB。
+- 编码自动识别有歧义时，需要用户手动选择编码重新打开。
+- 终端、问题面板只有预留布局；Git、语言服务器、格式化、重命名与删除文件尚未实现。
+- Windows 与 Linux 的选择器和完整桌面体验仍需在对应系统上验收；Linux 没有 `zenity`/`kdialog` 时可通过路径打开文件夹。
 
-## 技术结构
+## 验证与发布
 
-- `frontend/`：CodeMirror 6 + TypeScript + Vite 的工作台界面。
-- `backend/`：Go Sidecar，经 DBX 插件 JSON-RPC 桥接执行目录读取与文件保存。
-- `manifest.json`：声明工作台、Sidecar 和 `host.storage` 权限。
-- `ui/`：构建产物，由 `npm run build` 生成，勿手工修改。
-- `dist/`：`.dbxp` 本地开发包，由插件 CLI 生成，勿提交到源码仓库。
-
-Sidecar 只接受已打开目录内的相对路径，解析符号链接后再次检查边界。保存请求带原文件内容的 SHA-256 修订值，磁盘内容已变化时拒绝覆盖。
-
-## 验收标准
-
-- `npm run check`、`npm run build`、`go test ./...` 均通过。
-- `npm run plugin:package` 能生成当前平台的 `.dbxp` 开发包。
-- 在 DBX 插件开发宿主中可打开目录、切换文件、编辑并保存。
-- 外部修改后的保存会被拦截，当前草稿不会丢失。
-
-## 后续方向
-
-根据实际使用反馈，再评估目录选择器、文件创建/重命名、项目搜索、Git 状态和语言服务。
+提交前运行 `npm run check`、`npm run build`、在 `backend/` 中运行 `go test ./...`，并用 `npm run plugin:package` 构建候选包。`manifest.json` 的 ID 和版本必须与 Go Sidecar 元数据一致。发布时为每个经过验证的平台上传未签名 `.dbxp` 和 `.artifact.json`，由 DBX Store 审核、签名并纳入目录。

@@ -233,29 +233,73 @@ func (p *plugin) pickOnce(run func() (any, *dbxpluginsdk.PluginError)) (any, *db
 }
 
 func pickFolder() (any, *dbxpluginsdk.PluginError) {
-	return nativePicker(`POSIX path of (choose folder with prompt "Choose a project folder")`)
+	return nativePicker("folder")
 }
 
 func pickFile() (any, *dbxpluginsdk.PluginError) {
-	return nativePicker(`POSIX path of (choose file with prompt "Choose a text file")`)
+	return nativePicker("file")
 }
 
-func nativePicker(script string) (any, *dbxpluginsdk.PluginError) {
-	if runtime.GOOS != "darwin" {
-		return nil, invalidRequest("Native file picker is unavailable on this platform")
+func pickerCommand(platform, kind string) (string, []string, error) {
+	switch platform {
+	case "darwin":
+		script := `POSIX path of (choose file with prompt "Choose a text file")`
+		if kind == "folder" {
+			script = `POSIX path of (choose folder with prompt "Choose a project folder")`
+		}
+		return "/usr/bin/osascript", []string{"-e", script}, nil
+	case "windows":
+		const prefix = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Windows.Forms; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); `
+		script := prefix + `$dialog = New-Object System.Windows.Forms.OpenFileDialog; $dialog.Title = 'Choose a text file'; $dialog.CheckFileExists = $true; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.FileName) }`
+		if kind == "folder" {
+			script = prefix + `$dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = 'Choose a project folder'; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.SelectedPath) }`
+		}
+		return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-STA", "-Command", script}, nil
+	case "linux":
+		if executable, err := exec.LookPath("zenity"); err == nil {
+			args := []string{"--file-selection", "--title=Choose a text file"}
+			if kind == "folder" {
+				args = []string{"--file-selection", "--directory", "--title=Choose a project folder"}
+			}
+			return executable, args, nil
+		}
+		if executable, err := exec.LookPath("kdialog"); err == nil {
+			args := []string{"--title", "Choose a text file", "--getopenfilename"}
+			if kind == "folder" {
+				args = []string{"--title", "Choose a project folder", "--getexistingdirectory"}
+			}
+			return executable, args, nil
+		}
+		return "", nil, errors.New("Install zenity or kdialog to use the file picker; folders can also be opened by path")
+	default:
+		return "", nil, errors.New("Native file picker is unavailable on this platform")
+	}
+}
+
+func nativePicker(kind string) (any, *dbxpluginsdk.PluginError) {
+	executable, args, err := pickerCommand(runtime.GOOS, kind)
+	if err != nil {
+		return nil, invalidRequest(err.Error())
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "/usr/bin/osascript", "-e", script)
+	command := exec.CommandContext(ctx, executable, args...)
 	output, err := command.Output()
 	if err != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && (bytes.Contains(exitErr.Stderr, []byte("-128")) || bytes.Contains(exitErr.Stderr, []byte("User canceled"))) {
+		if runtime.GOOS == "darwin" && errors.As(err, &exitErr) && (bytes.Contains(exitErr.Stderr, []byte("-128")) || bytes.Contains(exitErr.Stderr, []byte("User canceled"))) {
+			return map[string]bool{"cancelled": true}, nil
+		}
+		if runtime.GOOS == "linux" && errors.As(err, &exitErr) && exitErr.ExitCode() == 1 && len(bytes.TrimSpace(exitErr.Stderr)) == 0 {
 			return map[string]bool{"cancelled": true}, nil
 		}
 		return nil, internalError(err)
 	}
-	return map[string]string{"path": strings.TrimSpace(string(output))}, nil
+	selected := strings.TrimSpace(string(output))
+	if selected == "" {
+		return map[string]bool{"cancelled": true}, nil
+	}
+	return map[string]string{"path": selected}, nil
 }
 
 func (p *plugin) openWorkspace(rawPath string) (any, *dbxpluginsdk.PluginError) {
@@ -553,7 +597,7 @@ func internalError(err error) *dbxpluginsdk.PluginError {
 }
 
 func main() {
-	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.13", Capabilities: []string{}}
+	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.14", Capabilities: []string{}}
 	store, err := newDraftStore()
 	if err != nil {
 		log.Fatal(err)
