@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
+  "manifest_version": 1,
+  "id": "io.github.yuwengueen.dbx-code-editor",
+  "name": "Code Editor",
+  "version": "0.1.13",
+  "publisher": "yuwengueen",
+  "description": "A lightweight local project code editor inside DBX.",
+  "icon": "assets/plugin.svg",
+  "source": "https://github.com/yuwenGueen/dbx-code-editor",
+  "homepage": "https://github.com/yuwenGueen/dbx-code-editor",
+  "engines": {
+    "dbx": ">=0.6.0",
+    "host_api": "1"
+  },
+  "permissions": ["host.storage"],
+  "entrypoints": {
+    "backend": {
+      "protocol_versions": [1],
+      "transport": "stdio-jsonl",
+      "executable": "bin/dbx-plugin-dbx-code-editor"
+    },
+    "ui": {
+      "root": "ui",
+      "entry": "ui/index.html"
+    }
+  },
+  "contributions": [
+    {
+      "type": "workbench",
+      "id": "io.github.yuwengueen.dbx-code-editor.workbench",
+      "label": "Code Editor",
+      "description": "Browse and edit a local project folder.",
+      "icon": "assets/plugin.svg"
+    }
+  ],
+  "localizations": {
+    "zh-CN": {
+      "name": "Code Editor",
+      "description": "在 DBX 中浏览和编辑本地项目文件。",
+      "contributions": {
+        "io.github.yuwengueen.dbx-code-editor.workbench": {
+          "label": "Code Editor",
+          "description": "浏览和编辑本地项目文件。"
+        }
+      }
+    }
+  }
+}

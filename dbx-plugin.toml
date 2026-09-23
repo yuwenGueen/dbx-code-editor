@@ -1,0 +1,12 @@
+schema_version = 1
+
+[backend]
+language = "go"
+directory = "backend"
+binary = "dbx-plugin-dbx-code-editor"
+
+[package]
+include = ["assets", "ui"]
+
+[dev]
+ui_build = ["npm", "run", "build"]

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DBX Code Editor">
+  <rect width="64" height="64" rx="15" fill="#263746"/>
+  <path d="m24 23-9 9 9 9m16-18 9 9-9 9" fill="none" stroke="#a8c4e5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m36 19-8 26" fill="none" stroke="#6fa5ec" stroke-width="4" stroke-linecap="round"/>
+</svg>

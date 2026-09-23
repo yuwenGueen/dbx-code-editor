@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en" data-appearance="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171c24" />
+    <title>Code Editor</title>
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <header class="topbar">
+        <button class="project-identity" id="workspace-switcher" type="button" title="Open folder">
+          <span class="brand-glyph" aria-hidden="true">&lt;/&gt;</span>
+          <span class="project-title" id="workspace-name">No folder open</span>
+          <span class="project-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <button class="quick-open" id="quick-open" type="button" title="Go to file">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+          <span id="quick-open-label">Go to file</span>
+          <kbd id="quick-open-shortcut">⌘ P</kbd>
+        </button>
+        <div class="topbar-actions">
+          <button class="icon-button" id="open-file" type="button" title="Open file" aria-label="Open file">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 2.5h8l4 4v11H4z"/><path d="M12 2.5v4h4M7 10h6M7 13h6"/></svg>
+          </button>
+          <button class="icon-button" id="toggle-sidebar" type="button" title="Toggle project panel" aria-label="Toggle project panel" aria-pressed="true">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.2" y="2.5" width="15.6" height="15" rx="2"/><path d="M7.2 2.5v15"/></svg>
+          </button>
+          <button class="icon-button" id="open-folder" type="button" title="Open folder" aria-label="Open folder">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5h5l1.5 1.7h8.5v8.3a1.5 1.5 0 0 1-1.5 1.5h-12a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M2.5 7.2V5a1.5 1.5 0 0 1 1.5-1.5h3.4l1.6 2"/></svg>
+          </button>
+          <button class="icon-button" id="command-palette" type="button" title="Command palette" aria-label="Command palette">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 5-4 5 4 5M13 5l4 5-4 5M11.5 3.5l-3 13"/></svg>
+          </button>
+          <button class="icon-button theme-button" id="toggle-theme" type="button" title="Toggle theme" aria-label="Toggle theme">☾</button>
+          <button class="icon-button" id="toggle-bottom-panel" type="button" title="Toggle bottom panel" aria-label="Toggle bottom panel" aria-pressed="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.2" y="2.5" width="15.6" height="15" rx="2"/><path d="M2.2 12.5h15.6"/></svg>
+          </button>
+          <span class="action-divider" aria-hidden="true"></span>
+          <button class="save-button" id="save-file" type="button" disabled data-i18n="save">Save</button>
+        </div>
+      </header>
+      <nav class="menu-bar" id="menu-bar" aria-label="Editor menu">
+        <button class="menu-trigger" type="button" data-menu="file" data-i18n="menuFile">File</button>
+        <button class="menu-trigger" type="button" data-menu="edit" data-i18n="menuEdit">Edit</button>
+        <button class="menu-trigger" type="button" data-menu="view" data-i18n="menuView">View</button>
+        <button class="menu-trigger" type="button" data-menu="go" data-i18n="menuGo">Go</button>
+        <div class="menu-popover" id="menu-popover" role="menu" hidden></div>
+      </nav>
+      <main class="workspace-layout" id="workspace-layout">
+        <aside class="explorer" id="explorer" aria-label="Project files">
+          <div class="panel-heading">
+            <span class="panel-label" data-i18n="projectPanel">Project</span>
+            <div class="panel-actions">
+              <button class="icon-button" id="new-file" type="button" title="New file" aria-label="New file" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 2.5h7l4 4v11H4z"/><path d="M11 2.5v4h4M10 10v5M7.5 12.5h5"/></svg>
+              </button>
+              <button class="icon-button" id="new-folder" type="button" title="New folder" aria-label="New folder" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 6h5l1.5 1.5h8v8.5H2.5zM10 10v4M8 12h4"/></svg>
+              </button>
+              <button class="icon-button" id="search-project" type="button" title="Search project" aria-label="Search project" aria-pressed="false" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8" cy="8" r="5"/><path d="m11.8 11.8 5 5M2.5 17h8"/></svg>
+              </button>
+              <button class="icon-button" id="refresh-tree" type="button" aria-label="Refresh files" title="Refresh files" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 9A6.5 6.5 0 1 0 17 11M16.5 4.5V9H12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="explorer-path" id="folder-path">Open a folder to get started.</div>
+          <div class="tree-progress" id="tree-progress" role="status" hidden></div>
+          <div class="open-editors-section" id="open-editors-section" hidden>
+            <div class="explorer-section-label" data-i18n="openEditors">OPEN EDITORS</div>
+            <div id="open-editors"></div>
+          </div>
+          <div class="explorer-section-label explorer-files-label" id="explorer-files-label">
+            <span data-i18n="files">FILES</span>
+            <div class="panel-actions">
+              <button class="icon-button" id="find-file" type="button" title="Find file by name" aria-label="Find file by name">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+              </button>
+              <button class="icon-button" id="expand-all-folders" type="button" title="Expand all folders" aria-label="Expand all folders" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12M7 3l-3 2 3 2M7 8l-3 2 3 2M7 13l-3 2 3 2"/></svg>
+              </button>
+              <button class="icon-button" id="collapse-all-folders" type="button" title="Collapse all folders" aria-label="Collapse all folders" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12M4 3l3 2-3 2M4 8l3 2-3 2M4 13l3 2-3 2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="tree-root" id="tree-root" role="tree"></div>
+          <div class="explorer-footer"><span class="footer-dot"></span><span data-i18n="localFiles">Local files</span></div>
+          <section class="project-search" id="project-search-panel" aria-label="Search project" hidden>
+            <div class="project-search-query">
+              <input id="project-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Search project text" aria-label="Search project text" />
+              <button id="project-search-submit" type="button" title="Search project" aria-label="Search project">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+              </button>
+            </div>
+            <div class="project-search-options">
+              <label><input id="project-search-case" type="checkbox" /><span data-i18n="caseSensitive">Match case</span></label>
+              <label><input id="project-search-build" type="checkbox" /><span data-i18n="includeBuildFolders">Include dependencies and build folders</span></label>
+            </div>
+            <div class="project-search-status" id="project-search-status" role="status"></div>
+            <div class="project-search-results" id="project-search-results"></div>
+          </section>
+        </aside>
+        <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize project panel" tabindex="0"></div>
+        <section class="editor-pane" id="editor-pane" aria-label="Editor">
+          <div class="tabs-row">
+            <div class="tabs" id="tabs" role="tablist"></div>
+            <div class="tab-actions">
+              <button class="icon-button new-tab-button" id="new-temporary-file" type="button" title="New temporary file" aria-label="New temporary file">+</button>
+              <button class="icon-button markdown-preview-toggle" id="toggle-markdown-preview" type="button" title="Preview Markdown" aria-label="Preview Markdown" aria-pressed="false" hidden>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2.3"/></svg>
+              </button>
+              <button class="icon-button" id="find-in-file" type="button" title="Find in file" aria-label="Find in file" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+              </button>
+              <button class="icon-button" id="close-active-tab" type="button" title="Close file" aria-label="Close file" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 4.5 15.5 15.5M15.5 4.5 4.5 15.5"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="breadcrumbs" id="breadcrumbs"><span data-i18n="noFileSelected">No file selected</span></div>
+          <div class="notice" id="notice" role="alert" hidden>
+            <span id="notice-text"></span>
+            <button id="notice-action" type="button" hidden></button>
+            <button class="notice-close" id="notice-close" type="button" aria-label="Dismiss">×</button>
+          </div>
+          <div class="editor-content" id="editor-content">
+            <div class="editor-surface" id="editor-surface"></div>
+            <section class="markdown-preview" id="markdown-preview" aria-label="Markdown preview" hidden>
+              <div class="markdown-preview-header"><span id="markdown-preview-title">Markdown preview</span><button class="icon-button" id="close-markdown-preview" type="button" title="Close Markdown preview" aria-label="Close Markdown preview">×</button></div>
+              <div class="markdown-preview-body" id="markdown-preview-body"></div>
+            </section>
+          </div>
+          <div class="welcome" id="welcome">
+            <div class="welcome-content">
+              <div class="welcome-intro">
+                <div class="welcome-mark" aria-hidden="true">&lt;/&gt;</div>
+                <p class="welcome-kicker">Code Editor</p>
+                <h1 id="welcome-title">Every file you open is a chance to make it better.</h1>
+                <p id="welcome-description">Open a project folder to browse, create and edit files.</p>
+              </div>
+              <div class="welcome-launch">
+                <div class="welcome-section-heading" data-i18n="quickActions">Quick actions</div>
+                <div class="welcome-actions">
+                  <button class="welcome-action" id="welcome-new" type="button"><span class="welcome-action-icon" aria-hidden="true">＋</span><span data-i18n="newTemporaryFile">New temporary file</span><kbd class="mod-shortcut">⌘ ⌥ N</kbd></button>
+                  <button class="welcome-action" id="welcome-open" type="button"><span class="welcome-action-icon" aria-hidden="true">▱</span><span id="welcome-open-label">Open folder</span></button>
+                  <button class="welcome-action" id="welcome-open-file" type="button"><span class="welcome-action-icon" aria-hidden="true">≡</span><span data-i18n="openFile">Open file</span><kbd class="mod-shortcut">⌘ O</kbd></button>
+                  <button class="welcome-action" id="welcome-language" type="button"><span class="welcome-action-icon welcome-action-icon-code" aria-hidden="true">{}</span><span data-i18n="chooseLanguageNew">New file with language</span></button>
+                  <button class="welcome-action" id="welcome-commands" type="button"><span class="welcome-action-icon" aria-hidden="true">☷</span><span data-i18n="commandPalette">Command palette</span><kbd class="mod-shortcut">⌘ ⇧ P</kbd></button>
+                </div>
+                <div class="welcome-recent" id="welcome-recent" hidden>
+                  <span data-i18n="recentFolders">Recent folders</span>
+                  <div id="recent-folders"></div>
+                </div>
+                <div class="welcome-recent" id="welcome-recent-files" hidden>
+                  <span data-i18n="recentFiles">Recent files</span>
+                  <div id="recent-files"></div>
+                </div>
+              </div>
+              <p class="welcome-tip" data-i18n="welcomeTip">Double-click empty space to create a temporary file.</p>
+            </div>
+          </div>
+          <section class="bottom-panel" id="bottom-panel" aria-label="Bottom panel" hidden>
+            <div class="bottom-panel-bar">
+              <button class="bottom-tab active" id="output-tab" type="button" aria-selected="true" data-i18n="output">Output</button>
+              <button class="bottom-tab reserved" id="terminal-tab" type="button" data-i18n="terminal">Terminal</button>
+              <button class="bottom-tab reserved" id="problems-tab" type="button" data-i18n="problems">Problems</button>
+              <span class="bottom-panel-spacer"></span>
+              <button class="icon-button" id="close-bottom-panel" type="button" aria-label="Close bottom panel">×</button>
+            </div>
+            <div class="bottom-panel-content" id="output-lines" role="log" aria-live="polite"></div>
+          </section>
+        </section>
+      </main>
+      <footer class="statusbar">
+        <span class="status-left"><span class="status-light"></span><span id="save-state">Ready</span></span>
+        <span class="status-right"><span id="cursor-position">Ln 1, Col 1</span><span class="status-divider"></span><button class="status-language" id="editor-font" type="button">Default monospace</button><span class="status-font-controls"><button class="status-language" id="font-size-decrease" type="button">A−</button><button class="status-language" id="editor-font-size" type="button">12.5px</button><button class="status-language" id="font-size-increase" type="button">A+</button></span><span class="status-divider"></span><button class="status-language" id="file-type" type="button" title="Select language">Plain text</button><span class="status-divider"></span><button class="status-language" id="file-encoding" type="button" title="Reopen with encoding">UTF-8</button></span>
+      </footer>
+    </div>
+    <div class="palette-backdrop" id="palette" hidden>
+      <div class="palette" role="dialog" aria-modal="true" aria-labelledby="palette-title">
+        <div class="palette-search">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+          <input id="palette-input" type="text" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="palette-results" aria-expanded="true" aria-labelledby="palette-title" />
+          <kbd>ESC</kbd>
+        </div>
+        <div class="palette-title" id="palette-title">Go to file</div>
+        <div class="palette-results" id="palette-results" role="listbox"></div>
+        <div class="palette-footer"><span>↑↓ <span data-i18n="navigate">Navigate</span></span><span>↵ <span data-i18n="select">Select</span></span></div>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="folder-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="folder-modal-title">
+        <div class="modal-kicker" data-i18n="workspaceLabel">WORKSPACE</div>
+        <h2 id="folder-modal-title" data-i18n="openFolder">Open folder</h2>
+        <p data-i18n="folderHint">Enter an absolute path to a folder on this computer.</p>
+        <label for="folder-input" data-i18n="folderPath">Folder path</label>
+        <input id="folder-input" type="text" spellcheck="false" autocomplete="off" placeholder="/Users/you/projects/my-app" />
+        <div class="modal-error" id="folder-error" role="alert" hidden></div>
+        <div class="modal-actions">
+          <button class="ghost-button" id="folder-browse" type="button" data-i18n="browse">Browse…</button>
+          <button class="ghost-button" id="folder-cancel" type="button" data-i18n="cancel">Cancel</button>
+          <button class="primary-button" id="folder-confirm" type="button" data-i18n="open">Open</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="create-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+        <div class="modal-kicker" data-i18n="projectPanel">PROJECT</div>
+        <h2 id="create-modal-title">New file</h2>
+        <p data-i18n="createHint">Enter a path relative to the open folder. Parent folders must already exist.</p>
+        <label for="create-input" data-i18n="nameOrPath">Name or relative path</label>
+        <input id="create-input" type="text" spellcheck="false" autocomplete="off" placeholder="src/example.ts" />
+        <div class="modal-error" id="create-error" role="alert" hidden></div>
+        <div class="modal-actions">
+          <button class="ghost-button" id="create-cancel" type="button" data-i18n="cancel">Cancel</button>
+          <button class="primary-button" id="create-confirm" type="button" data-i18n="create">Create</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="confirm-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="modal-kicker" data-i18n="unsavedChanges">UNSAVED CHANGES</div>
+        <h2 id="confirm-modal-title" data-i18n="discardTitle">Discard changes?</h2>
+        <p id="confirm-modal-message"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" id="confirm-cancel" type="button" data-i18n="keepEditing">Keep editing</button>
+          <button class="danger-button" id="confirm-discard" type="button" data-i18n="discard">Discard</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
