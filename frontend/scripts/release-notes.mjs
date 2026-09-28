@@ -46,6 +46,6 @@ if (process.argv.includes("--write")) {
   console.log(`Synchronized v${latest.version} release notes.`);
 } else {
   assert(store.releaseNotes === storeNotes, ".dbx-store.json releaseNotes are stale; run npm run notes:sync.");
-  assert(read("CHANGELOG.md") === changelog, "CHANGELOG.md is stale; run npm run notes:sync.");
+  assert(read("CHANGELOG.md").replace(/\r\n/g, "\n") === changelog, "CHANGELOG.md is stale; run npm run notes:sync.");
   console.log(`Release notes match v${latest.version}.`);
 }

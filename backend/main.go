@@ -622,7 +622,7 @@ func internalError(err error) *dbxpluginsdk.PluginError {
 }
 
 func main() {
-	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.16", Capabilities: []string{}}
+	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.17", Capabilities: []string{}}
 	store, err := newDraftStore()
 	if err != nil {
 		log.Fatal(err)
