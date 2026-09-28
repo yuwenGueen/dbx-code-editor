@@ -114,12 +114,12 @@ func TestEditorPreferencesPersist(t *testing.T) {
 	store := &draftStore{dir: filepath.Join(t.TempDir(), "drafts")}
 	projectA := filepath.Join(t.TempDir(), "project-a")
 	projectB := filepath.Join(t.TempDir(), "project-b")
-	want := editorPreferences{RecentFolders: []string{projectA, projectB}, RecentPositions: []filePosition{{Path: filepath.Join(projectA, "readme.txt"), Selection: 123, ScrollTop: 456}}, Session: editorSession{WorkspacePath: projectA, OpenFiles: []string{"readme.txt"}, ActiveFile: "readme.txt", ActiveDraft: "draft-12345678"}, Theme: "dark", EditorFont: "menlo", EditorFontSize: 15}
+	want := editorPreferences{RecentFolders: []string{projectA, projectB}, RecentPositions: []filePosition{{Path: filepath.Join(projectA, "readme.txt"), Selection: 123, ScrollTop: 456}}, Session: editorSession{WorkspacePath: projectA, OpenFiles: []string{"readme.txt"}, ActiveFile: "readme.txt", ActiveDraft: "draft-12345678"}, Theme: "dark", EditorFont: "menlo", EditorFontSize: 15, SeenReleaseNotesVersion: "0.1.16"}
 	if err := store.savePreferences(want); err != nil {
 		t.Fatal(err)
 	}
 	got, err := (&draftStore{dir: store.dir}).loadPreferences()
-	if err != nil || got.Theme != want.Theme || len(got.RecentFolders) != 2 || got.RecentFolders[0] != want.RecentFolders[0] || got.EditorFont != want.EditorFont || got.EditorFontSize != want.EditorFontSize || len(got.RecentPositions) != 1 || got.RecentPositions[0].ScrollTop != 456 || got.Session.WorkspacePath != want.Session.WorkspacePath || len(got.Session.OpenFiles) != 1 || got.Session.ActiveFile != "readme.txt" || got.Session.ActiveDraft != "draft-12345678" {
+	if err != nil || got.Theme != want.Theme || len(got.RecentFolders) != 2 || got.RecentFolders[0] != want.RecentFolders[0] || got.EditorFont != want.EditorFont || got.EditorFontSize != want.EditorFontSize || got.SeenReleaseNotesVersion != want.SeenReleaseNotesVersion || len(got.RecentPositions) != 1 || got.RecentPositions[0].ScrollTop != 456 || got.Session.WorkspacePath != want.Session.WorkspacePath || len(got.Session.OpenFiles) != 1 || got.Session.ActiveFile != "readme.txt" || got.Session.ActiveDraft != "draft-12345678" {
 		t.Fatalf("preferences should survive restart: %#v, %v", got, err)
 	}
 	want.Session.OpenFiles = []string{"../outside.txt"}

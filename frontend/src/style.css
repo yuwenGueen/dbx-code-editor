@@ -17,6 +17,8 @@
   --accent-soft: rgba(75, 112, 203, .1);
   --hover: #edf1f7;
   --selection: #e5ecfa;
+  --editor-selection: #c5d8f8;
+  --editor-selection-inactive: #dce5f5;
   --shadow: 0 22px 70px rgba(26, 42, 67, .2);
   --code-font: "SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", monospace;
   --editor-font: var(--code-font);
@@ -52,6 +54,8 @@
   --accent-soft: rgba(154, 183, 246, .13);
   --hover: #343b45;
   --selection: #3b4554;
+  --editor-selection: #405878;
+  --editor-selection-inactive: #34445d;
   --shadow: 0 25px 80px rgba(0, 0, 0, .48);
   --syntax-keyword: #c9a5f6;
   --syntax-string: #9bd9b5;
@@ -478,7 +482,18 @@ kbd { font: 10px var(--code-font); }
 .modal label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 650; }
 .modal input { width: 100%; height: 37px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--app-bg); color: inherit; font: 12px var(--code-font); }
 .modal-error { margin-top: 9px; color: #cb6969; font-size: 11px; }
+.modal .create-destination { overflow-wrap: anywhere; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; font: 11px/1.5 var(--code-font); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.release-notes-modal { width: min(540px, 100%); max-height: min(78vh, 720px); display: flex; flex-direction: column; }
+.release-notes-modal > p { flex: 0 0 auto; margin-bottom: 12px; }
+.release-notes-list { min-height: 0; overflow-y: auto; padding-right: 8px; border-top: 1px solid var(--line); }
+.release-note { padding: 16px 2px 18px; }
+.release-note + .release-note { border-top: 1px solid var(--line); }
+.release-note h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; color: var(--text); font-size: 13px; font-weight: 700; }
+.release-note-current { padding: 3px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 650; }
+.release-note ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.release-note li + li { margin-top: 5px; }
+.release-notes-modal .modal-actions { flex: 0 0 auto; margin-top: 12px; }
 .ghost-button, .primary-button, .danger-button { min-height: 30px; padding: 6px 12px; font-size: 11px; font-weight: 650; border-radius: 5px; }
 .ghost-button { border: 1px solid var(--line); background: transparent; color: inherit; }
 .ghost-button:hover { background: var(--hover); }

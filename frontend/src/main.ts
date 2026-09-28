@@ -1,14 +1,23 @@
 import { basicSetup } from "codemirror";
 import { Compartment, EditorState } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
-import { indentWithTab, undo, redo } from "@codemirror/commands";
-import { HighlightStyle, LanguageDescription, syntaxHighlighting } from "@codemirror/language";
+import { EditorView, keymap, type KeyBinding } from "@codemirror/view";
+import {
+  addCursorAbove, addCursorBelow, copyLineDown, copyLineUp, cursorMatchingBracket,
+  deleteLine, indentLess, indentMore, indentWithTab, insertBlankLine,
+  lineComment, lineUncomment, moveLineDown, moveLineUp, redo, selectLine,
+  toggleBlockComment, toggleComment, undo
+} from "@codemirror/commands";
+import {
+  foldAll, foldCode, HighlightStyle, LanguageDescription,
+  syntaxHighlighting, unfoldAll, unfoldCode
+} from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { gotoLine, openSearchPanel } from "@codemirror/search";
+import { gotoLine, openSearchPanel, selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
 import { tags } from "@lezer/highlight";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { languageBadge } from "./language-icons";
+import releaseNotesData from "./release-notes.json";
 import "./style.css";
 
 interface Bridge {
@@ -54,6 +63,7 @@ interface TreeNode extends Entry {
 }
 
 interface EditorTab {
+	wordImport?: WordImportInfo;
   name: string;
   path: string;
   content: string;
@@ -73,6 +83,7 @@ interface EditorTab {
 }
 
 interface DraftRecord {
+	wordImport?: WordImportInfo;
   id: string;
   name: string;
   content: string;
@@ -81,6 +92,12 @@ interface DraftRecord {
   selection: number;
   scrollTop: number;
   updatedAt: number;
+}
+
+interface WordImportInfo { assetFolder: string; imageCount: number }
+
+function wordAssetURL(folder: string): string {
+  return encodeURIComponent(folder).replace(/[!'()*]/g, (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase());
 }
 
 interface DraftQueue {
@@ -93,7 +110,7 @@ type Locale = "en" | "zh";
 type LanguageId = string;
 type PaletteMode = "files" | "commands" | "languages" | "encodings" | "fonts";
 type EditorFontId = "default" | "sf-mono" | "menlo" | "monaco" | "andale-mono" | "courier-new" | "pt-mono" | "songti-sc" | "hiragino-sans-gb" | "stheiti";
-type MenuName = "file" | "edit" | "view" | "go";
+type MenuName = "file" | "edit" | "view" | "go" | "help";
 
 interface PaletteItem {
   label: string;
@@ -113,6 +130,13 @@ const strings = {
   en: {
     openFolder: "Open folder",
     openFile: "Open file…",
+    importWord: "Import Word as Markdown…",
+    importingWord: "Converting Word document…",
+    importWordFailed: "Could not import Word",
+    wordImported: "Imported as a temporary Markdown draft. Save it to choose a folder; images will be saved alongside it.",
+    wordWarnings: "Some images or formulas could not be converted. Check the preview before saving.",
+    wordSaveHint: "Choose a Markdown filename. Images will be saved in a matching .assets folder. Existing files will not be overwritten.",
+    chooseSaveFolder: "Choose save folder…",
     selectEncoding: "Reopen with encoding",
     selectFont: "Editor font",
     fontPreview: "Preview · 中文 ABC 123",
@@ -155,6 +179,10 @@ const strings = {
     menuEdit: "Edit",
     menuView: "View",
     menuGo: "Go",
+    menuHelp: "Help",
+    whatsNew: "What's New",
+    releaseNotesIntro: "Changes in this version and earlier updates.",
+    closeReleaseNotes: "Close update notes",
     replaceInFile: "Replace in file",
     undo: "Undo",
     redo: "Redo",
@@ -248,6 +276,13 @@ const strings = {
   zh: {
     openFolder: "打开文件夹",
     openFile: "打开文件…",
+    importWord: "导入 Word 为 Markdown…",
+    importingWord: "正在转换 Word 文档…",
+    importWordFailed: "Word 导入失败",
+    wordImported: "已转为临时 Markdown 草稿。保存时选择目录，图片会一并保存到旁边的资源文件夹。",
+    wordWarnings: "部分图片或公式未能转换，请检查预览中的提示后再保存。",
+    wordSaveHint: "输入 Markdown 文件名，图片会保存到同名 .assets 文件夹；已有文件不会被覆盖。",
+    chooseSaveFolder: "选择保存目录…",
     selectEncoding: "按指定编码重新打开",
     selectFont: "编辑器字体",
     fontPreview: "预览 · 中文 ABC 123",
@@ -290,6 +325,10 @@ const strings = {
     menuEdit: "编辑",
     menuView: "视图",
     menuGo: "转到",
+    menuHelp: "帮助",
+    whatsNew: "更新说明",
+    releaseNotesIntro: "查看本次及此前版本的更新内容。",
+    closeReleaseNotes: "关闭更新说明",
     replaceInFile: "在文件中替换",
     undo: "撤销",
     redo: "重做",
@@ -437,21 +476,75 @@ let draftErrorShown = false;
 let preferenceWrite: Promise<void> = Promise.resolve();
 const wrapCompartment = new Compartment();
 const languageCompartment = new Compartment();
+const themeCompartment = new Compartment();
 let openMenu: MenuName | null = null;
 let bottomPanelTab: "output" | "terminal" | "problems" = "output";
 let pendingEncodingEntry: Entry | null = null;
 let nativePickerOpen = false;
 let markdownPreviewTimer: number | undefined;
+let markdownImageSequence = 0;
+const markdownImageCache = new Map<string, string>();
+let releaseNotesReturnFocus: HTMLElement | null = null;
+let seenReleaseNotesVersion = "";
 
-const editorTheme = EditorView.theme({
+const releaseNotes = releaseNotesData.releases;
+const currentVersion = releaseNotes[0].version;
+
+const editorTheme = (dark: boolean) => EditorView.theme({
   "&": { backgroundColor: "var(--editor-bg)", color: "var(--text)" },
   ".cm-scroller": { fontFamily: "var(--editor-font)", fontSize: "var(--editor-font-size)", lineHeight: "1.65" },
   ".cm-gutters": { backgroundColor: "var(--pane-bg)", color: "var(--muted)" },
   ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--accent) 6%, transparent)" },
   ".cm-activeLineGutter": { backgroundColor: "color-mix(in srgb, var(--accent) 8%, transparent)" },
-  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "color-mix(in srgb, var(--accent) 28%, transparent)" },
+  ".cm-selectionBackground": { background: "var(--editor-selection-inactive)" },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": { background: "var(--editor-selection)" },
   ".cm-cursor": { borderLeftColor: "var(--accent)" }
-});
+}, { dark });
+
+function insertLineAbove(view: EditorView): boolean {
+  const line = view.state.doc.lineAt(view.state.selection.main.from);
+  const indent = /^\s*/.exec(line.text)?.[0] ?? "";
+  view.dispatch({
+    changes: { from: line.from, insert: indent + "\n" },
+    selection: { anchor: line.from + indent.length },
+    scrollIntoView: true
+  });
+  return true;
+}
+
+function selectAllOccurrences(view: EditorView): boolean {
+  if (view.state.selection.main.empty && !selectNextOccurrence(view)) return false;
+  return selectSelectionMatches(view);
+}
+
+const vscodeEditorKeymap: KeyBinding[] = [
+  { key: "Alt-ArrowUp", run: moveLineUp },
+  { key: "Alt-ArrowDown", run: moveLineDown },
+  { key: "Shift-Alt-ArrowUp", run: copyLineUp },
+  { key: "Shift-Alt-ArrowDown", run: copyLineDown },
+  { key: "Mod-Shift-k", run: deleteLine, preventDefault: true },
+  { key: "Mod-Enter", run: insertBlankLine },
+  { key: "Mod-Shift-Enter", run: insertLineAbove },
+  { mac: "Mod-Shift-\\", win: "Ctrl-Shift-\\", linux: "Ctrl-Shift-\\", run: cursorMatchingBracket },
+  { key: "Mod-[", run: indentLess },
+  { key: "Mod-]", run: indentMore },
+  { key: "Mod-/", run: toggleComment, preventDefault: true },
+  { key: "Shift-Alt-a", run: toggleBlockComment },
+  { key: "Mod-l", run: selectLine },
+  { key: "Mod-d", run: selectNextOccurrence },
+  { key: "Mod-Shift-l", run: selectAllOccurrences },
+  { mac: "Mod-Alt-ArrowUp", win: "Ctrl-Alt-ArrowUp", linux: "Ctrl-Alt-ArrowUp", run: addCursorAbove },
+  { mac: "Mod-Alt-ArrowDown", win: "Ctrl-Alt-ArrowDown", linux: "Ctrl-Alt-ArrowDown", run: addCursorBelow },
+  { mac: "Mod-Alt-[", win: "Ctrl-Shift-[", linux: "Ctrl-Shift-[", run: foldCode },
+  { mac: "Mod-Alt-]", win: "Ctrl-Shift-]", linux: "Ctrl-Shift-]", run: unfoldCode },
+  { key: "Mod-k Mod-c", run: lineComment },
+  { key: "Mod-k Mod-u", run: lineUncomment },
+  { key: "Mod-k Mod-0", run: foldAll },
+  { key: "Mod-k Mod-j", run: unfoldAll },
+  { key: "Mod-k m", run: () => { showPalette("languages"); return true; } },
+  { key: "Mod-k Mod-t", run: () => { toggleTheme(); return true; } },
+  { key: "Mod-j", run: () => { setBottomPanelVisible(element("bottom-panel").hidden); return true; } }
+];
 
 const highlight = HighlightStyle.define([
   { tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword, tags.operatorKeyword], color: "var(--syntax-keyword)", fontWeight: "600" },
@@ -542,7 +635,16 @@ function renderMarkdownPreview(tab: EditorTab) {
     return;
   }
   try {
-    body.innerHTML = DOMPurify.sanitize(marked.parse(tab.content, { async: false, gfm: true }));
+    const fragment = DOMPurify.sanitize(marked.parse(tab.content, { async: false, gfm: true }), { RETURN_DOM_FRAGMENT: true });
+    const localImages: { image: HTMLImageElement; path: string }[] = [];
+    fragment.querySelectorAll<HTMLImageElement>("img[src]").forEach((image) => {
+      const source = image.getAttribute("src") ?? "";
+      if (/^(?:https?:|data:)/i.test(source)) return;
+      image.removeAttribute("src");
+      localImages.push({ image, path: source });
+    });
+    body.replaceChildren(fragment);
+    void renderLocalMarkdownImages(tab, localImages, ++markdownImageSequence);
     body.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
       if (link.getAttribute("href")?.startsWith("#")) return;
       link.target = "_blank";
@@ -550,6 +652,34 @@ function renderMarkdownPreview(tab: EditorTab) {
     });
   } catch {
     body.textContent = tab.content;
+  }
+}
+
+async function renderLocalMarkdownImages(tab: EditorTab, images: { image: HTMLImageElement; path: string }[], sequence: number) {
+  const scope = workspace;
+  for (const item of images) {
+    if (sequence !== markdownImageSequence || activeTab() !== tab || !tab.preview) return;
+    try {
+      const relative = decodeURIComponent(item.path);
+      let method: string;
+      let params: Record<string, unknown>;
+      if (tab.untitled && tab.wordImport && relative.startsWith(tab.wordImport.assetFolder + "/")) {
+        method = "draft/image";
+        params = { id: draftId(tab), path: relative.slice(tab.wordImport.assetFolder.length + 1) };
+      } else if (!tab.untitled && scope) {
+        method = "workspace/image";
+        const parent = tab.path.split("/").slice(0, -1).join("/");
+        params = { workspaceId: scope.workspaceId, path: parent ? parent + "/" + relative : relative };
+      } else continue;
+      const key = method + JSON.stringify(params);
+      let source = markdownImageCache.get(key);
+      if (!source) {
+        source = (await invoke<{ url: string }>(method, params)).url;
+        if (markdownImageCache.size >= 32) markdownImageCache.delete(markdownImageCache.keys().next().value!);
+        markdownImageCache.set(key, source);
+      }
+      if (sequence === markdownImageSequence && item.image.isConnected) item.image.src = source;
+    } catch { item.image.title = locale === "zh" ? "图片无法加载" : "Image unavailable"; }
   }
 }
 
@@ -717,8 +847,9 @@ function applyLocale() {
   element<HTMLInputElement>("project-search-input").setAttribute("aria-label", t("searchProjectText"));
   element("project-search-panel").setAttribute("aria-label", t("searchProject"));
   if (!element("tree-progress").hidden) element("tree-progress").textContent = t("expandingFolders");
-  element("close-active-tab").setAttribute("title", `${t("closeFile")} (Ctrl+Alt+W)`);
-  element("new-temporary-file").setAttribute("title", `${t("newTemporaryFile")} (⌘⌥N / Ctrl+Alt+N)`);
+  const mac = navigator.platform.toLowerCase().includes("mac");
+  element("close-active-tab").setAttribute("title", `${t("closeFile")} (${mac ? "⌘W" : "Ctrl+W"} / Ctrl+Alt+W)`);
+  element("new-temporary-file").setAttribute("title", `${t("newTemporaryFile")} (${mac ? "⌘N / ⌘⌥N" : "Ctrl+N / Ctrl+Alt+N"})`);
   const fontModifier = navigator.platform.toLowerCase().includes("mac") ? "⌘⌥" : "Ctrl+Alt+";
   element("font-size-increase").setAttribute("title", `${t("increaseFontSize")} (${fontModifier}=)`);
   element("font-size-decrease").setAttribute("title", `${t("decreaseFontSize")} (${fontModifier}-)`);
@@ -726,6 +857,7 @@ function applyLocale() {
   element("welcome-title").textContent = workspace ? t("chooseTitle") : t("welcomeTitle");
   element("welcome-description").textContent = workspace ? t("chooseDescription") : t("welcomeDescription");
   element("create-modal-title").textContent = createMode === "saveAs" ? t("saveAs") : t(createKind === "file" ? "newFile" : "newFolder");
+  element("create-hint").textContent = savingUntitled?.wordImport ? t("wordSaveHint") : t("createHint");
   updateStatus();
   renderTree();
   renderTabs();
@@ -736,10 +868,16 @@ function applyLocale() {
   renderBottomPanel();
   if (openMenu) renderMenu(openMenu);
   if (!element("palette").hidden) renderPalette();
+  if (!element("release-notes-modal").hidden) renderReleaseNotes();
 }
 
 function applyTheme() {
   document.documentElement.dataset.appearance = themePreference;
+  const themeEffect = themeCompartment.reconfigure(editorTheme(themePreference === "dark"));
+  editor?.dispatch({ effects: themeEffect });
+  for (const tab of tabs) {
+    if (tab !== editorTab && tab.state) tab.state = tab.state.update({ effects: themeEffect }).state;
+  }
   element("toggle-theme").textContent = themePreference === "dark" ? "☀" : "☾";
   const modifier = navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl";
   document.querySelectorAll<HTMLElement>(".mod-key").forEach((key) => { key.textContent = modifier; });
@@ -762,6 +900,56 @@ function hideNotice() {
   element<HTMLButtonElement>("notice-action").onclick = null;
 }
 
+function renderReleaseNotes() {
+  const container = element("release-notes-list");
+  container.replaceChildren();
+  for (const [index, release] of releaseNotes.entries()) {
+    const section = document.createElement("section");
+    section.className = "release-note";
+    const heading = document.createElement("h3");
+    heading.textContent = `v${release.version} · ${release.date}`;
+    section.append(heading);
+    if (index === 0) {
+      const badge = document.createElement("span");
+      badge.className = "release-note-current";
+      badge.textContent = locale === "zh" ? "当前版本" : "Current version";
+      heading.append(badge);
+    }
+    const list = document.createElement("ul");
+    for (const note of release[locale]) {
+      const item = document.createElement("li");
+      item.textContent = note;
+      list.append(item);
+    }
+    section.append(list);
+    container.append(section);
+  }
+}
+
+function showReleaseNotes() {
+  if (!element("release-notes-modal").hidden) {
+    element<HTMLButtonElement>("release-notes-close").focus();
+    return;
+  }
+  releaseNotesReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  hideMenu();
+  renderReleaseNotes();
+  element("release-notes-modal").hidden = false;
+  element<HTMLButtonElement>("release-notes-close").focus();
+}
+
+function hideReleaseNotes() {
+  element("release-notes-modal").hidden = true;
+  releaseNotesReturnFocus?.focus();
+  releaseNotesReturnFocus = null;
+  seenReleaseNotesVersion = currentVersion;
+  queuePreferencesSave();
+}
+
+function maybeShowReleaseNotes() {
+  if (seenReleaseNotesVersion !== currentVersion) showReleaseNotes();
+}
+
 function activeTab(): EditorTab | null {
   return tabs.find((tab) => tab.path === activePath) ?? null;
 }
@@ -779,6 +967,7 @@ function newDraftId(): string {
 
 function draftSnapshot(tab: EditorTab): DraftRecord {
   return {
+    wordImport: tab.wordImport,
     id: draftId(tab), name: tab.name, content: tab.content, languageId: tab.languageId,
     languageAuto: tab.languageAuto, selection: tab.selection, scrollTop: tab.scrollTop, updatedAt: Date.now()
   };
@@ -851,7 +1040,7 @@ function queuePreferencesSave() {
     activeFile: activeTab()?.untitled ? "" : activePath ?? "",
     activeDraft: activeTab()?.untitled ? draftId(activeTab()!) : ""
   } : { workspacePath: "", singleFile: false, openFiles: [], activeFile: "", activeDraft: activeTab()?.untitled ? draftId(activeTab()!) : "" };
-  const snapshot = { recentFolders: [...recentFolders], recentFiles: [...recentFiles], recentPositions: [...recentPositions], session, theme: themePreference, editorFont: editorFontPreference, editorFontSize };
+  const snapshot = { recentFolders: [...recentFolders], recentFiles: [...recentFiles], recentPositions: [...recentPositions], session, theme: themePreference, editorFont: editorFontPreference, editorFontSize, seenReleaseNotesVersion };
   preferenceWrite = preferenceWrite.catch(() => {}).then(async () => {
     await bridge.ready;
     await invoke("preferences/save", snapshot);
@@ -895,7 +1084,8 @@ async function restoreDrafts() {
       name: draft.name, path: `untitled:${draft.id}`, content: draft.content, savedContent: "", revision: "",
       dirty: draft.content.length > 0, selection: Math.max(0, Math.min(draft.selection || 0, draft.content.length)),
       scrollTop: Math.max(0, draft.scrollTop || 0), untitled: true, languageId: normalizeLanguageId(draft.languageId),
-      languageAuto: Boolean(draft.languageAuto), draftPersisted: true, draftError: false
+      languageAuto: Boolean(draft.languageAuto), draftPersisted: true, draftError: false,
+      wordImport: draft.wordImport, preview: Boolean(draft.wordImport)
     };
     tabs.push(tab);
     latest = tab;
@@ -1281,11 +1471,12 @@ function renderEditor(resetState = false) {
       doc: tab.content,
       selection: { anchor: Math.min(tab.selection, tab.content.length) },
       extensions: [
+        keymap.of(vscodeEditorKeymap),
         basicSetup,
         keymap.of([indentWithTab]),
         languageCompartment.of(languageExtension(tab.languageId)),
         syntaxHighlighting(highlight),
-        editorTheme,
+        themeCompartment.of(editorTheme(themePreference === "dark")),
         wrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -1735,6 +1926,28 @@ async function chooseFile() {
   }
 }
 
+async function importWord() {
+  if (!bridge) { showNotice(t("hostMissing")); return; }
+  if (nativePickerOpen) return;
+  nativePickerOpen = true;
+  showNotice(t("importingWord"));
+  try {
+    const result = await invoke<{ draft?: DraftRecord; cancelled?: boolean; busy?: boolean; warnings?: number }>("word/import", {}, 300000);
+    if (!result.draft) { hideNotice(); return; }
+    const draft = result.draft;
+    const tab: EditorTab = {
+      name: draft.name, path: `untitled:${draft.id}`, content: draft.content, savedContent: "", revision: "",
+      dirty: true, selection: 0, scrollTop: 0, untitled: true, languageId: "Markdown", languageAuto: false,
+      draftPersisted: true, wordImport: draft.wordImport, preview: true
+    };
+    tabs.push(tab);
+    activateTab(tab.path);
+    showNotice(t("wordImported") + (result.warnings ? " " + t("wordWarnings") : ""));
+  } catch (error) {
+    showNotice(`${t("importWordFailed")}: ${error instanceof Error ? error.message : error}`);
+  } finally { nativePickerOpen = false; }
+}
+
 function hideFolderModal() {
   element("folder-modal").hidden = true;
   pendingUntitledSave = false;
@@ -1778,11 +1991,16 @@ function showCreateModal(kind: "file" | "directory", mode: "new" | "saveAs" = "n
   savingUntitled = tab;
   element("create-modal-title").textContent = mode === "saveAs" ? t("saveAs") : t(kind === "file" ? "newFile" : "newFolder");
   element("create-confirm").textContent = mode === "saveAs" ? t("save") : t("create");
+  element("create-hint").textContent = tab?.wordImport ? t("wordSaveHint") : t("createHint");
+  element("create-destination").hidden = !tab?.wordImport;
+  element("create-destination").textContent = workspace.path;
+  element("create-destination").title = workspace.path;
+  element("create-browse").hidden = !tab?.wordImport;
   element("create-error").hidden = true;
   const parent = mode === "new" && activeTab() && !activeTab()?.untitled
     ? activeTab()!.path.split("/").slice(0, -1).join("/") : "";
   const input = element<HTMLInputElement>("create-input");
-  input.value = parent ? parent + "/" : "";
+  input.value = tab?.wordImport ? tab.name : parent ? parent + "/" : "";
   input.placeholder = kind === "directory" ? "src/components" : "src/example.ts";
   element("create-modal").hidden = false;
   input.focus();
@@ -1804,8 +2022,9 @@ async function submitCreate() {
   const content = tab?.content ?? "";
   button.disabled = true;
   try {
-    const result = await invoke<{ entry: Entry; revision: string }>("workspace/create", {
-      workspaceId: currentWorkspace.workspaceId, path, kind: createKind, content
+    const result = await invoke<{ entry: Entry; revision: string; content?: string }>("workspace/create", {
+      workspaceId: currentWorkspace.workspaceId, path, kind: createKind, content,
+      draftId: tab?.wordImport ? draftId(tab) : undefined
     });
     if (workspace !== currentWorkspace) return;
     hideCreateModal();
@@ -1814,8 +2033,15 @@ async function submitCreate() {
       tab.path = result.entry.path;
       tab.name = result.entry.name;
       tab.revision = result.revision;
-      tab.savedContent = content;
-      tab.dirty = tab.content !== content;
+      if (tab.wordImport && result.content !== undefined) {
+        const oldFolder = wordAssetURL(tab.wordImport.assetFolder);
+        const nextFolder = wordAssetURL(result.entry.name.replace(/\.md$/i, "") + ".assets");
+        tab.content = tab.content.split("](" + oldFolder + "/").join("](" + nextFolder + "/");
+        tab.state = undefined;
+      }
+      tab.savedContent = result.content ?? content;
+      tab.dirty = tab.content !== tab.savedContent;
+      tab.wordImport = undefined;
       tab.untitled = false;
       if (tab.languageAuto) tab.languageId = detectLanguage(tab.name, tab.content);
       recentTabs = recentTabs.map((item) => item === oldPath ? tab.path : item);
@@ -1940,24 +2166,25 @@ function renderMenu(name: MenuName) {
   type MenuItem = { label: string; shortcut?: string; detail?: string; fullPath?: string; action: () => void | Promise<void>; enabled?: boolean };
   const current = activeTab();
   const sections: MenuItem[][] = name === "file" ? [
-    [{ label: t("newTemporaryFile"), shortcut: mod === "⌘" ? "⌘⌥N" : "Ctrl+Alt+N", action: newUntitledTab },
+    [{ label: t("newTemporaryFile"), shortcut: mod + "N", action: newUntitledTab },
       { label: t("newFileInProject"), action: () => showCreateModal("file"), enabled: Boolean(workspace && !workspace.singleFile) },
       { label: t("newFolder"), action: () => showCreateModal("directory"), enabled: Boolean(workspace && !workspace.singleFile) },
       { label: t("openFile"), shortcut: mod + "O", action: chooseFile },
+      { label: t("importWord"), action: importWord },
       { label: t("openFolder"), action: chooseFolder },
       { label: t("goToFile"), shortcut: mod + "P", action: () => showPalette("files"), enabled: Boolean(workspace) }],
     [{ label: t("save"), shortcut: mod + "S", action: saveActive, enabled: Boolean(current) },
-      { label: t("closeFile"), shortcut: "Ctrl+Alt+W", action: () => { if (current) void closeTab(current); }, enabled: Boolean(current) }]
+      { label: t("closeFile"), shortcut: mod + "W", action: () => { if (current) void closeTab(current); }, enabled: Boolean(current) }]
   ] : name === "edit" ? [
     [{ label: t("undo"), shortcut: mod + "Z", action: () => { if (editor) undo(editor); }, enabled: Boolean(editor) },
       { label: t("redo"), shortcut: mod + "⇧Z", action: () => { if (editor) redo(editor); }, enabled: Boolean(editor) }],
     [{ label: t("findInFile"), shortcut: mod + "F", action: findInFile, enabled: Boolean(editor) },
-      { label: t("replaceInFile"), shortcut: mod + "⌥F", action: replaceInFile, enabled: Boolean(editor) },
+      { label: t("replaceInFile"), shortcut: mod === "⌘" ? "⌘⌥F" : "Ctrl+H", action: replaceInFile, enabled: Boolean(editor) },
       { label: t("searchProject"), shortcut: mod === "⌘" ? "⌘⇧F" : "Ctrl+Shift+F", action: () => setProjectSearchMode(true), enabled: Boolean(workspace) }]
   ] : name === "view" ? [
     [{ label: t("toggleProjectPanel"), shortcut: mod + "B", action: () => setSidebarVisible(!sidebarVisible) },
-      { label: t("toggleBottomPanel"), action: () => setBottomPanelVisible(element("bottom-panel").hidden) },
-      { label: t("toggleTheme"), action: toggleTheme },
+      { label: t("toggleBottomPanel"), shortcut: mod + "J", action: () => setBottomPanelVisible(element("bottom-panel").hidden) },
+      { label: t("toggleTheme"), shortcut: mod + "K " + mod + "T", action: toggleTheme },
       { label: wordWrap ? t("disableWrap") : t("enableWrap"), shortcut: "Alt+Z", action: toggleWordWrap },
       { label: t("expandAllFolders"), action: () => expandFolders(), enabled: Boolean(workspace && !workspace.singleFile) },
       { label: t("collapseAllFolders"), action: () => collapseFolders(), enabled: Boolean(workspace && !workspace.singleFile) }],
@@ -1965,10 +2192,12 @@ function renderMenu(name: MenuName) {
       { label: t("increaseFontSize"), shortcut: fontMod + "=", action: () => changeEditorFontSize(1) },
       { label: t("decreaseFontSize"), shortcut: fontMod + "-", action: () => changeEditorFontSize(-1) },
       { label: t("resetFontSize"), shortcut: fontMod + "0", action: () => changeEditorFontSize(0) }]
-  ] : [
+  ] : name === "go" ? [
     [{ label: t("goToFile"), shortcut: mod + "P", action: () => showPalette("files"), enabled: Boolean(workspace) },
-      { label: t("goToLine"), action: jumpToLine, enabled: Boolean(editor) },
+      { label: t("goToLine"), shortcut: "Ctrl+G", action: jumpToLine, enabled: Boolean(editor) },
       { label: t("commandPalette"), shortcut: mod + "⇧P", action: () => showPalette("commands") }]
+  ] : [
+    [{ label: t("whatsNew"), action: showReleaseNotes }]
   ];
   const sectionTitles = new Map<number, string>();
   const recentPathItem = (path: string, action: () => void): MenuItem => {
@@ -2252,11 +2481,13 @@ function commandItems(): PaletteItem[] {
   const mod = modifierLabel();
   const fontMod = mod === "⌘" ? "⌘⌥" : "Ctrl+Alt+";
   const items: PaletteItem[] = [
-    { label: t("newTemporaryFile"), shortcut: mod === "⌘" ? "⌘⌥N" : "Ctrl+Alt+N", action: newUntitledTab },
+    { label: t("whatsNew"), action: showReleaseNotes },
+    { label: t("newTemporaryFile"), shortcut: mod + "N", action: newUntitledTab },
     { label: t("openFile"), shortcut: mod + "O", action: chooseFile },
+    { label: t("importWord"), action: importWord },
     { label: t("openFolder"), action: chooseFolder },
     { label: t("toggleProjectPanel"), shortcut: mod + "B", action: () => setSidebarVisible(!sidebarVisible) },
-    { label: t("toggleTheme"), action: toggleTheme },
+    { label: t("toggleTheme"), shortcut: mod + "K " + mod + "T", action: toggleTheme },
     { label: t("selectFont"), action: () => showPalette("fonts") },
     { label: t("increaseFontSize"), shortcut: fontMod + "=", action: () => changeEditorFontSize(1) },
     { label: t("decreaseFontSize"), shortcut: fontMod + "-", action: () => changeEditorFontSize(-1) },
@@ -2279,16 +2510,16 @@ function commandItems(): PaletteItem[] {
     items.push(
       { label: t("save"), shortcut: mod + "S", action: saveActive },
       { label: t("findInFile"), shortcut: mod + "F", action: findInFile },
-      { label: t("replaceInFile"), action: replaceInFile },
-      { label: t("selectLanguage"), action: () => showPalette("languages") },
+      { label: t("replaceInFile"), shortcut: mod === "⌘" ? "⌘⌥F" : "Ctrl+H", action: replaceInFile },
+      { label: t("selectLanguage"), shortcut: mod + "K M", action: () => showPalette("languages") },
       { label: t("selectEncoding"), action: () => showPalette("encodings") },
-      { label: t("goToLine"), action: jumpToLine },
-      { label: t("closeFile"), shortcut: "Ctrl+Alt+W", action: () => closeTab(activeTab()!) }
+      { label: t("goToLine"), shortcut: "Ctrl+G", action: jumpToLine },
+      { label: t("closeFile"), shortcut: mod + "W", action: () => closeTab(activeTab()!) }
     );
   }
   if (isMarkdownTab(activeTab())) items.push({ label: t("previewMarkdown"), action: toggleMarkdownPreview });
   items.push({ label: wordWrap ? t("disableWrap") : t("enableWrap"), shortcut: "Alt+Z", action: toggleWordWrap });
-  items.push({ label: t("toggleBottomPanel"), action: () => setBottomPanelVisible(element("bottom-panel").hidden) });
+  items.push({ label: t("toggleBottomPanel"), shortcut: mod + "J", action: () => setBottomPanelVisible(element("bottom-panel").hidden) });
   return items;
 }
 
@@ -2455,6 +2686,7 @@ function wireEvents() {
   element("workspace-switcher").onclick = () => { void chooseFolder(); };
   element("welcome-open").onclick = () => { void chooseFolder(); };
   element("welcome-open-file").onclick = () => { void chooseFile(); };
+  element("welcome-import-word").onclick = () => { void importWord(); };
   element("welcome-new").onclick = newUntitledTab;
   element("new-temporary-file").onclick = newUntitledTab;
   element("welcome-language").onclick = () => { newUntitledTab(); showPalette("languages"); };
@@ -2540,6 +2772,10 @@ function wireEvents() {
     element<HTMLInputElement>(id).onchange = () => { if (projectSearchInput.value.trim()) void runProjectSearch(); };
   }
   element("notice-close").onclick = hideNotice;
+  element("release-notes-close").onclick = hideReleaseNotes;
+  element("release-notes-modal").onclick = (event) => {
+    if (event.target === element("release-notes-modal")) hideReleaseNotes();
+  };
   element("palette").onclick = (event) => { if (event.target === element("palette")) hidePalette(); };
   const paletteInput = element<HTMLInputElement>("palette-input");
   paletteInput.oninput = () => { paletteSelection = 0; renderPalette(); };
@@ -2561,6 +2797,14 @@ function wireEvents() {
     if (event.key === "Enter") { event.preventDefault(); void submitFolder(); }
   };
   element("create-cancel").onclick = hideCreateModal;
+  element("create-browse").onclick = async () => {
+    const tab = savingUntitled;
+    if (!tab || nativePickerOpen) return;
+    element("create-modal").hidden = true;
+    pendingUntitledSave = true;
+    await chooseFolder();
+    if (element("folder-modal").hidden && workspace && !workspace.singleFile && tabs.includes(tab) && tab.untitled) showCreateModal("file", "saveAs", tab);
+  };
   element("create-confirm").onclick = () => { void submitCreate(); };
   element<HTMLInputElement>("create-input").onkeydown = (event) => {
     if (event.key === "Enter") { event.preventDefault(); void submitCreate(); }
@@ -2604,13 +2848,18 @@ function wireEvents() {
       if (!element("folder-modal").hidden) { event.preventDefault(); hideFolderModal(); return; }
       if (!element("create-modal").hidden) { event.preventDefault(); hideCreateModal(); return; }
       if (!element("confirm-modal").hidden) { event.preventDefault(); element<HTMLButtonElement>("confirm-cancel").click(); return; }
+      if (!element("release-notes-modal").hidden) { event.preventDefault(); hideReleaseNotes(); return; }
       if (projectSearchMode && document.activeElement === element("project-search-input")) { event.preventDefault(); setProjectSearchMode(false); return; }
     }
-    const mod = event.metaKey || event.ctrlKey;
+    if (!element("release-notes-modal").hidden) {
+      if (event.key === "Tab") { event.preventDefault(); element<HTMLButtonElement>("release-notes-close").focus(); }
+      return;
+    }
+    const mod = navigator.platform.toLowerCase().includes("mac") ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.code.startsWith("Key") ? event.code.slice(3).toLowerCase() : event.key.toLowerCase();
     if (!element("palette").hidden) {
-      if (mod && event.shiftKey && key === "p") { event.preventDefault(); showPalette("commands"); }
-      else if (mod && key === "p") { event.preventDefault(); showPalette("files"); }
+      if (event.key === "F1" || mod && event.shiftKey && !event.altKey && key === "p") { event.preventDefault(); showPalette("commands"); }
+      else if (mod && !event.shiftKey && !event.altKey && key === "p") { event.preventDefault(); showPalette("files"); }
       return;
     }
     if (!element("folder-modal").hidden || !element("create-modal").hidden || !element("confirm-modal").hidden) return;
@@ -2620,41 +2869,47 @@ function wireEvents() {
       if (event.code === "Minus" || event.code === "NumpadSubtract") { event.preventDefault(); changeEditorFontSize(-1); return; }
       if (!event.shiftKey && (event.code === "Digit0" || event.code === "Numpad0")) { event.preventDefault(); changeEditorFontSize(0); return; }
     }
-    if (mod && event.shiftKey && key === "p") {
+    if (event.key === "F1" || mod && event.shiftKey && !event.altKey && key === "p") {
       event.preventDefault();
       showPalette("commands");
-    } else if (mod && key === "p") {
+    } else if (mod && !event.shiftKey && !event.altKey && key === "p") {
       event.preventDefault();
       showPalette("files");
-    } else if (mod && key === "s") {
+    } else if (mod && !event.shiftKey && !event.altKey && key === "s") {
       event.preventDefault();
       void saveActive();
-    } else if (mod && key === "o") {
+    } else if (mod && !event.shiftKey && !event.altKey && key === "o") {
       event.preventDefault();
       void chooseFile();
     } else if (event.ctrlKey && event.altKey && key === "o") {
       event.preventDefault();
       void chooseFile();
-    } else if (mod && event.altKey && !event.shiftKey && key === "n") {
+    } else if (mod && !event.shiftKey && key === "n") {
       event.preventDefault();
       newUntitledTab();
-    } else if (mod && event.shiftKey && key === "f") {
+    } else if (mod && event.shiftKey && !event.altKey && key === "f") {
       if (workspace) { event.preventDefault(); setProjectSearchMode(true); }
-    } else if (mod && key === "f") {
+    } else if (mod && !event.shiftKey && key === "f") {
       if (editor) { event.preventDefault(); if (event.altKey) replaceInFile(); else findInFile(); }
-    } else if (mod && key === "w") {
+    } else if (!navigator.platform.toLowerCase().includes("mac") && mod && !event.shiftKey && !event.altKey && key === "h") {
+      if (editor) { event.preventDefault(); replaceInFile(); }
+    } else if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && key === "g") {
+      if (editor) { event.preventDefault(); jumpToLine(); }
+    } else if ((mod && !event.shiftKey && !event.altKey && key === "w") ||
+      (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && key === "w") ||
+      (!navigator.platform.toLowerCase().includes("mac") && event.ctrlKey && !event.altKey && !event.shiftKey && event.key === "F4")) {
       const tab = activeTab();
       if (tab) { event.preventDefault(); void closeTab(tab); }
-    } else if (mod && key === "b") {
+    } else if (mod && !event.shiftKey && !event.altKey && key === "b") {
       event.preventDefault();
       setSidebarVisible(!sidebarVisible);
-    } else if (mod && event.shiftKey && key === "e") {
+    } else if (mod && event.shiftKey && !event.altKey && key === "e") {
       event.preventDefault();
       focusExplorer();
-    } else if (event.ctrlKey && event.key === "Tab") {
+    } else if (event.ctrlKey && !event.altKey && !event.metaKey && event.key === "Tab") {
       event.preventDefault();
       cycleTab(event.shiftKey ? -1 : 1);
-    } else if (event.altKey && key === "z") {
+    } else if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && key === "z") {
       event.preventDefault();
       toggleWordWrap();
     }
@@ -2693,7 +2948,7 @@ async function init() {
       } catch { /* Draft recovery is independent of host preferences. */ }
     }
     try {
-      const preferences = await invoke<{ recentFolders: string[]; recentFiles: string[]; recentPositions?: SavedFilePosition[]; session?: SavedSession; theme: string; editorFont?: string; editorFontSize?: number }>("preferences/get", {});
+      const preferences = await invoke<{ recentFolders: string[]; recentFiles: string[]; recentPositions?: SavedFilePosition[]; session?: SavedSession; theme: string; editorFont?: string; editorFontSize?: number; seenReleaseNotesVersion?: string }>("preferences/get", {});
       if (Array.isArray(preferences.recentFolders) && preferences.recentFolders.length) {
         recentFolders = preferences.recentFolders.filter((item): item is string => typeof item === "string").slice(0, 8);
       }
@@ -2705,6 +2960,7 @@ async function init() {
       if (preferences.session && typeof preferences.session.workspacePath === "string") savedSession = preferences.session;
       if (editorFonts.some((font) => font.id === preferences.editorFont)) editorFontPreference = preferences.editorFont as EditorFontId;
       if (typeof preferences.editorFontSize === "number" && preferences.editorFontSize >= 10 && preferences.editorFontSize <= 24) editorFontSize = preferences.editorFontSize;
+      if (typeof preferences.seenReleaseNotesVersion === "string") seenReleaseNotesVersion = preferences.seenReleaseNotesVersion;
     } catch (error) {
       showNotice(`${t("preferencesSaveFailed")}: ${String(error instanceof Error ? error.message : error)}`);
     }
@@ -2715,6 +2971,7 @@ async function init() {
     try { await restoreDrafts(); }
     catch (error) { showNotice(`${t("draftRestoreFailed")}: ${String(error instanceof Error ? error.message : error)}`); }
     if (savedSession?.activeDraft && tabs.some((tab) => tab.path === `untitled:${savedSession.activeDraft}`)) activateTab(`untitled:${savedSession.activeDraft}`);
+    maybeShowReleaseNotes();
   } catch (error) {
     showNotice(String(error instanceof Error ? error.message : error));
   }

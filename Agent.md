@@ -10,6 +10,7 @@
 - 本地目录访问由 Go Sidecar 执行。所有文件路径必须限制在用户打开的根目录内；符号链接也要校验。
 - 保存文件前核对修订值；遇到外部修改时保留用户草稿并显示明确错误。
 - 不把连接信息、密钥、文件内容或开发宿主数据写入日志、测试快照或提交。
+- 每次提交要用能说明实际改动的提交标题和正文；准备用户可见的新版本时，在 `frontend/src/release-notes.json` 增加中英文更新条目，运行 `npm run notes:sync` 同步商店说明与 `CHANGELOG.md`。不要发布没有更新内容的版本。
 - 发布前核对公开源码、许可证、清单版本和候选包；只有用户明确授权后才推送、创建 Release 或提交 DBX Store。官方插件签名由 DBX Store 维护者完成。
 
 ## 常用命令
@@ -18,6 +19,7 @@
 
 ```bash
 npm ci
+npm run notes:sync
 npm run check
 npm run build
 npm run plugin:dev

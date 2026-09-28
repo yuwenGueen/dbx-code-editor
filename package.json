@@ -1,12 +1,14 @@
 {
   "name": "dbx-code-editor",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && npm run notes:check",
+    "notes:sync": "node frontend/scripts/release-notes.mjs --write",
+    "notes:check": "node frontend/scripts/release-notes.mjs --check",
     "plugin:dev": "GOFLAGS=-buildvcs=false dbx-plugin dev --path . --port 5190",
     "plugin:package": "npm run build && dbx-plugin package ."
   },

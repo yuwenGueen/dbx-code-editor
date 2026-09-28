@@ -17,14 +17,15 @@ const maxDraftBytes = 1 << 20
 const maxDraftJSONBytes = 1800000
 
 type draftRecord struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Content      string `json:"content"`
-	LanguageID   string `json:"languageId"`
-	LanguageAuto bool   `json:"languageAuto"`
-	Selection    int    `json:"selection"`
-	ScrollTop    int    `json:"scrollTop"`
-	UpdatedAt    int64  `json:"updatedAt"`
+	WordImport   *wordImportInfo `json:"wordImport,omitempty"`
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Content      string          `json:"content"`
+	LanguageID   string          `json:"languageId"`
+	LanguageAuto bool            `json:"languageAuto"`
+	Selection    int             `json:"selection"`
+	ScrollTop    int             `json:"scrollTop"`
+	UpdatedAt    int64           `json:"updatedAt"`
 }
 
 type draftStore struct {
@@ -32,13 +33,14 @@ type draftStore struct {
 }
 
 type editorPreferences struct {
-	RecentFolders   []string       `json:"recentFolders"`
-	RecentFiles     []string       `json:"recentFiles"`
-	RecentPositions []filePosition `json:"recentPositions"`
-	Session         editorSession  `json:"session"`
-	Theme           string         `json:"theme"`
-	EditorFont      string         `json:"editorFont"`
-	EditorFontSize  float64        `json:"editorFontSize"`
+	RecentFolders           []string       `json:"recentFolders"`
+	RecentFiles             []string       `json:"recentFiles"`
+	RecentPositions         []filePosition `json:"recentPositions"`
+	Session                 editorSession  `json:"session"`
+	Theme                   string         `json:"theme"`
+	EditorFont              string         `json:"editorFont"`
+	EditorFontSize          float64        `json:"editorFontSize"`
+	SeenReleaseNotesVersion string         `json:"seenReleaseNotesVersion"`
 }
 
 type editorSession struct {
@@ -106,6 +108,9 @@ func (s *draftStore) save(record draftRecord) error {
 	}
 	if record.Selection < 0 || record.ScrollTop < 0 {
 		return errors.New("invalid temporary draft position")
+	}
+	if record.WordImport != nil && (record.WordImport.ImageCount < 0 || record.WordImport.ImageCount > 100 || record.WordImport.AssetFolder == "" || len(record.WordImport.AssetFolder) > 255 || strings.ContainsAny(record.WordImport.AssetFolder, "/\\\x00")) {
+		return errors.New("invalid imported document metadata")
 	}
 	if err := s.ensureDirectory(); err != nil {
 		return err
@@ -218,7 +223,7 @@ func (s *draftStore) delete(id string) error {
 	if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove temporary draft: %w", err)
 	}
-	return nil
+	return os.RemoveAll(filepath.Join(s.dir, id+".assets"))
 }
 
 func (s *draftStore) loadPreferences() (editorPreferences, error) {

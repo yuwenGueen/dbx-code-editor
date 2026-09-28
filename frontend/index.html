@@ -45,6 +45,7 @@
         <button class="menu-trigger" type="button" data-menu="edit" data-i18n="menuEdit">Edit</button>
         <button class="menu-trigger" type="button" data-menu="view" data-i18n="menuView">View</button>
         <button class="menu-trigger" type="button" data-menu="go" data-i18n="menuGo">Go</button>
+        <button class="menu-trigger" type="button" data-menu="help" data-i18n="menuHelp">Help</button>
         <div class="menu-popover" id="menu-popover" role="menu" hidden></div>
       </nav>
       <main class="workspace-layout" id="workspace-layout">
@@ -147,6 +148,7 @@
                   <button class="welcome-action" id="welcome-new" type="button"><span class="welcome-action-icon" aria-hidden="true">＋</span><span data-i18n="newTemporaryFile">New temporary file</span><kbd class="mod-shortcut">⌘ ⌥ N</kbd></button>
                   <button class="welcome-action" id="welcome-open" type="button"><span class="welcome-action-icon" aria-hidden="true">▱</span><span id="welcome-open-label">Open folder</span></button>
                   <button class="welcome-action" id="welcome-open-file" type="button"><span class="welcome-action-icon" aria-hidden="true">≡</span><span data-i18n="openFile">Open file</span><kbd class="mod-shortcut">⌘ O</kbd></button>
+                  <button class="welcome-action" id="welcome-import-word" type="button"><span class="welcome-action-icon" aria-hidden="true">W</span><span data-i18n="importWord">Import Word as Markdown…</span></button>
                   <button class="welcome-action" id="welcome-language" type="button"><span class="welcome-action-icon welcome-action-icon-code" aria-hidden="true">{}</span><span data-i18n="chooseLanguageNew">New file with language</span></button>
                   <button class="welcome-action" id="welcome-commands" type="button"><span class="welcome-action-icon" aria-hidden="true">☷</span><span data-i18n="commandPalette">Command palette</span><kbd class="mod-shortcut">⌘ ⇧ P</kbd></button>
                 </div>
@@ -210,12 +212,14 @@
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
         <div class="modal-kicker" data-i18n="projectPanel">PROJECT</div>
         <h2 id="create-modal-title">New file</h2>
-        <p data-i18n="createHint">Enter a path relative to the open folder. Parent folders must already exist.</p>
+        <p id="create-hint" data-i18n="createHint">Enter a path relative to the open folder. Parent folders must already exist.</p>
+        <p id="create-destination" class="create-destination" hidden></p>
         <label for="create-input" data-i18n="nameOrPath">Name or relative path</label>
         <input id="create-input" type="text" spellcheck="false" autocomplete="off" placeholder="src/example.ts" />
         <div class="modal-error" id="create-error" role="alert" hidden></div>
         <div class="modal-actions">
           <button class="ghost-button" id="create-cancel" type="button" data-i18n="cancel">Cancel</button>
+          <button class="ghost-button" id="create-browse" type="button" data-i18n="chooseSaveFolder" hidden>Choose save folder…</button>
           <button class="primary-button" id="create-confirm" type="button" data-i18n="create">Create</button>
         </div>
       </div>
@@ -228,6 +232,17 @@
         <div class="modal-actions">
           <button class="ghost-button" id="confirm-cancel" type="button" data-i18n="keepEditing">Keep editing</button>
           <button class="danger-button" id="confirm-discard" type="button" data-i18n="discard">Discard</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="release-notes-modal" hidden>
+      <div class="modal release-notes-modal" role="dialog" aria-modal="true" aria-labelledby="release-notes-title" aria-describedby="release-notes-intro">
+        <div class="modal-kicker">CODE EDITOR</div>
+        <h2 id="release-notes-title" data-i18n="whatsNew">What's New</h2>
+        <p id="release-notes-intro" data-i18n="releaseNotesIntro">Changes in this version and earlier updates.</p>
+        <div class="release-notes-list" id="release-notes-list"></div>
+        <div class="modal-actions">
+          <button class="primary-button" id="release-notes-close" type="button" data-i18n="closeReleaseNotes">Close</button>
         </div>
       </div>
     </div>

@@ -56,6 +56,7 @@ type saveRequest struct {
 }
 
 type createRequest struct {
+	DraftID     string `json:"draftId,omitempty"`
 	WorkspaceID string `json:"workspaceId"`
 	Path        string `json:"path"`
 	Kind        string `json:"kind"`
@@ -71,6 +72,12 @@ type entry struct {
 
 func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params json.RawMessage, _ *dbxpluginsdk.Emitter) (any, *dbxpluginsdk.PluginError) {
 	switch method {
+	case "word/import":
+		return p.pickOnce(p.importWord)
+	case "draft/image":
+		return p.readImage(params, true)
+	case "workspace/image":
+		return p.readImage(params, false)
 	case "workspace/open":
 		var request workspaceRequest
 		if err := json.Unmarshal(params, &request); err != nil {
@@ -247,12 +254,18 @@ func pickerCommand(platform, kind string) (string, []string, error) {
 		if kind == "folder" {
 			script = `POSIX path of (choose folder with prompt "Choose a project folder")`
 		}
+		if kind == "word" {
+			script = `POSIX path of (choose file with prompt "选择 Word 文档 / Import Word" of type {"org.openxmlformats.wordprocessingml.document"})`
+		}
 		return "/usr/bin/osascript", []string{"-e", script}, nil
 	case "windows":
 		const prefix = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Windows.Forms; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); `
 		script := prefix + `$dialog = New-Object System.Windows.Forms.OpenFileDialog; $dialog.Title = 'Choose a text file'; $dialog.CheckFileExists = $true; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.FileName) }`
 		if kind == "folder" {
 			script = prefix + `$dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = 'Choose a project folder'; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.SelectedPath) }`
+		}
+		if kind == "word" {
+			script = prefix + `$dialog = New-Object System.Windows.Forms.OpenFileDialog; $dialog.Title = 'Import Word'; $dialog.Filter = 'Word document (*.docx)|*.docx'; $dialog.CheckFileExists = $true; if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.FileName) }`
 		}
 		return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-STA", "-Command", script}, nil
 	case "linux":
@@ -261,12 +274,18 @@ func pickerCommand(platform, kind string) (string, []string, error) {
 			if kind == "folder" {
 				args = []string{"--file-selection", "--directory", "--title=Choose a project folder"}
 			}
+			if kind == "word" {
+				args = []string{"--file-selection", "--title=Import Word", "--file-filter=Word | *.docx"}
+			}
 			return executable, args, nil
 		}
 		if executable, err := exec.LookPath("kdialog"); err == nil {
 			args := []string{"--title", "Choose a text file", "--getopenfilename"}
 			if kind == "folder" {
 				args = []string{"--title", "Choose a project folder", "--getexistingdirectory"}
+			}
+			if kind == "word" {
+				args = []string{"--title", "Import Word", "--getopenfilename", ".", "*.docx"}
 			}
 			return executable, args, nil
 		}
@@ -562,6 +581,12 @@ func (p *plugin) create(request createRequest) (any, *dbxpluginsdk.PluginError) 
 		if err := os.Mkdir(file, 0755); err != nil {
 			return nil, internalError(err)
 		}
+	} else if request.DraftID != "" {
+		content, err := p.createWordMarkdown(file, request.DraftID, request.Content)
+		if err != nil {
+			return nil, invalidRequest(err.Error())
+		}
+		return map[string]any{"entry": entry{Name: filepath.Base(clean), Path: filepath.ToSlash(clean), Kind: "file"}, "revision": revision([]byte(content)), "content": content}, nil
 	} else {
 		handle, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err != nil {
@@ -597,7 +622,7 @@ func internalError(err error) *dbxpluginsdk.PluginError {
 }
 
 func main() {
-	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.15", Capabilities: []string{}}
+	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.16", Capabilities: []string{}}
 	store, err := newDraftStore()
 	if err != nil {
 		log.Fatal(err)
