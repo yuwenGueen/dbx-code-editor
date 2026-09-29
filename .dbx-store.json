@@ -14,7 +14,7 @@
   "source": "https://github.com/yuwenGueen/dbx-code-editor",
   "homepage": "https://github.com/yuwenGueen/dbx-code-editor",
   "license": "Apache-2.0",
-  "releaseNotes": "v0.1.28\n- 再次点击 AI 按钮即可折叠模型选择面板，保留已保存的供应商和模型。\n\nEnglish\n- Click the AI button again to collapse the model picker, preserving saved provider and model preferences.",
+  "releaseNotes": "v0.1.29\n- 修复 Windows 发布测试中不适用的 POSIX 可执行权限断言，保留 Git 与 AI 提交说明功能。\n\nEnglish\n- Fix the Windows release check for POSIX executable permission bits while retaining Git and AI commit message features.",
   "localizations": {
     "zh-CN": {
       "name": "Code Editor",

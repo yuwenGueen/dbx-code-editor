@@ -8,6 +8,9 @@ import (
 )
 
 func TestGitExecutableCandidates(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX executable permission bits are not supported on Windows; this helper is used only on macOS")
+	}
 	root := t.TempDir()
 	nonexec := filepath.Join(root, "not-executable")
 	native := filepath.Join(root, "git")

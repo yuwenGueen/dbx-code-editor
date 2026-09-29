@@ -1,5 +1,15 @@
 # 更新日志 / Changelog
 
+## v0.1.29 · 2026-09-29
+
+### 中文
+
+- 修复 Windows 发布测试中不适用的 POSIX 可执行权限断言，保留 Git 与 AI 提交说明功能。
+
+### English
+
+- Fix the Windows release check for POSIX executable permission bits while retaining Git and AI commit message features.
+
 ## v0.1.28 · 2026-09-29
 
 ### 中文

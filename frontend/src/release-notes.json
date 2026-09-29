@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "0.1.29",
+      "date": "2026-09-29",
+      "zh": [
+        "修复 Windows 发布测试中不适用的 POSIX 可执行权限断言，保留 Git 与 AI 提交说明功能。"
+      ],
+      "en": [
+        "Fix the Windows release check for POSIX executable permission bits while retaining Git and AI commit message features."
+      ]
+    },
+    {
       "version": "0.1.28",
       "date": "2026-09-29",
       "zh": [
