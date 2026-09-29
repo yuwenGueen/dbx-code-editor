@@ -8,7 +8,8 @@
     "developer-tools"
   ],
   "permissions": [
-    "host.storage"
+    "host.storage",
+    "host.ai"
   ],
   "source": "https://github.com/yuwenGueen/dbx-code-editor",
   "homepage": "https://github.com/yuwenGueen/dbx-code-editor",
