@@ -1,5 +1,59 @@
 # 更新日志 / Changelog
 
+## v0.1.33 · 2026-09-29
+
+### 中文
+
+- AI 会话保存输入草稿、模型、模式、引用文件及修改提案，兼容旧聊天记录，恢复后应用仍校验磁盘修订。
+- AI 修改可在编辑区审查，显示行号和增删高亮，左右同步滚动。
+- 回复支持 Markdown、代码高亮与复制；宿主不支持 AI 或模型不可用时显示原因并禁用发送。
+
+### English
+
+- Persist AI drafts, model, mode, file references and proposals with legacy history compatibility and revision checks on restored edits.
+- Review AI proposals in the editor with line numbers, added/deleted lines and synchronized scrolling.
+- Render Markdown and highlighted copyable code; explain unavailable host/model capabilities and disable sending.
+
+## v0.1.32 · 2026-09-29
+
+### 中文
+
+- AI 对话按项目自动保存到本机，可从顶部历史入口继续会话、重命名或删除。
+- 保留完整聊天文本，恢复时重新读取文件，不会重放旧的文件修改；保存失败提供重试入口。
+
+### English
+
+- Save AI conversations locally per project, with a history picker to resume, rename, or delete sessions.
+- Preserve full chat text and reread files when continuing; never replay historical edits, and offer retry on save failure.
+
+## v0.1.31 · 2026-09-29
+
+### 中文
+
+- 重排 AI 面板：对话居中、输入区固定底部，模型和模式集中在输入区。
+- 开发任务按需展开，只有产生修改时显示审查操作，文件读取过程可折叠。
+
+### English
+
+- Reorganize AI around a scrollable conversation and anchored composer with model and mode controls.
+- Show review actions only for changes; collapse file-reading steps and reveal development tasks on demand.
+
+## v0.1.30 · 2026-09-29
+
+### 中文
+
+- 新增右侧 AI 编程面板：复用 DBX 模型，附加已保存文件，按需求生成小型项目或文件修改方案。
+- AI 文件修改需逐个审查应用，支持拒绝和撤销；校验目录边界、符号链接与磁盘修订，保护未保存草稿。
+- 支持 Ask / Agent 连续对话，自动读取当前文件、按需检索项目文件及 @路径 上下文。
+- 新增开发任务运行、停止、输出反馈和本地预览入口；执行前确认项目脚本。
+
+### English
+
+- Add an AI coding sidebar using DBX models, saved-file context, and reviewable project/file generation.
+- Review and apply each file, reject or undo changes, with path, symlink, disk revision and unsaved-draft checks.
+- Add Ask/Agent conversations with current-file context, bounded project file retrieval and @path references.
+- Run and stop project scripts with confirmation, inspect task output, send errors to AI, and open local previews.
+
 ## v0.1.29 · 2026-09-29
 
 ### 中文

@@ -31,7 +31,7 @@ export function splitDiff(content: string): DiffRow[] {
 
 const diffCleanup = new WeakMap<HTMLElement, () => void>();
 
-export function renderSplitDiff(host: HTMLElement, content: string, staged: boolean, zh: boolean) {
+export function renderSplitDiff(host: HTMLElement, content: string, staged: boolean, zh: boolean, ai = false) {
  diffCleanup.get(host)?.();
  const rows = splitDiff(content);
  const view = document.createElement("section"); view.className = "git-split";
@@ -40,7 +40,7 @@ export function renderSplitDiff(host: HTMLElement, content: string, staged: bool
  for (const side of ["before", "after"] as const) {
   const column = document.createElement("section"); column.className = "git-split-column";
   const heading = document.createElement("header");
-  heading.textContent = side === "before" ? (zh ? `修改前 · ${staged ? "HEAD" : "暂存区"}` : `Before · ${staged ? "HEAD" : "Index"}`) : (zh ? `修改后 · ${staged ? "暂存区" : "工作区"}` : `After · ${staged ? "Index" : "Working tree"}`);
+  heading.textContent = ai ? (side === "before" ? (zh ? "修改前 · 提案生成时" : "Before · Original snapshot") : (zh ? "修改后 · AI 提案" : "After · AI proposal")) : side === "before" ? (zh ? `修改前 · ${staged ? "HEAD" : "暂存区"}` : `Before · ${staged ? "HEAD" : "Index"}`) : (zh ? `修改后 · ${staged ? "暂存区" : "工作区"}` : `After · ${staged ? "Index" : "Working tree"}`);
   const pane = document.createElement("div"); pane.className = "git-split-scroll"; pane.tabIndex = 0;
   pane.setAttribute("aria-label", heading.textContent);
   const body = document.createElement("div"); body.className = "git-split-lines";
@@ -66,6 +66,8 @@ export function renderSplitDiff(host: HTMLElement, content: string, staged: bool
  }, {passive:true});
  const hint = document.createElement("div"); hint.className = "git-split-hint";
  hint.textContent = zh ? "只读 · 横纵滚动同步 · 仅显示修改及附近上下文 · 点击文件刷新" : "Read only · Synchronized scrolling · Changes and context · Click file to refresh";
+ if(ai)hint.textContent=zh ? "只读 · 横纵滚动同步 · 返回 AI 面板接受或拒绝；应用前核对磁盘版本" : "Read only · Synchronized scrolling · Accept or reject in AI panel; revisions checked before applying";
+ if(ai&&content.includes("\\ 文件末尾换行发生变化"))hint.textContent+=(zh ? " · 文件末尾换行发生变化" : " · Final newline changed");
  host.replaceChildren(hint,view);
  const alignWidths=()=>{
   const left=panes[0].scrollLeft;

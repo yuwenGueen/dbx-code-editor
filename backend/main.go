@@ -33,6 +33,8 @@ type workspaceScope struct {
 }
 
 type plugin struct {
+	historyMu  sync.Mutex
+	devTasks   map[string]*devTask
 	mu         sync.RWMutex
 	workspaces map[string]workspaceScope
 	drafts     *draftStore
@@ -72,6 +74,12 @@ type entry struct {
 
 func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params json.RawMessage, _ *dbxpluginsdk.Emitter) (any, *dbxpluginsdk.PluginError) {
 	switch method {
+	case "dev/info", "dev/start", "dev/status", "dev/stop", "dev/preview":
+		return p.devTaskCall(method, params)
+	case "ai/history/list", "ai/history/read", "ai/history/save", "ai/history/delete":
+		return p.aiHistory(method, params)
+	case "ai/write":
+		return p.aiWrite(params)
 	case "git/info":
 		return p.gitInfo(params)
 	case "git/action":
@@ -213,6 +221,10 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 			return nil, invalidRequest("Missing workspace ID")
 		}
 		p.mu.Lock()
+		if task := p.devTasks[request.WorkspaceID]; task != nil {
+			task.cancel()
+			delete(p.devTasks, request.WorkspaceID)
+		}
 		delete(p.workspaces, request.WorkspaceID)
 		for id, session := range p.reads {
 			if session.workspaceID == request.WorkspaceID {
@@ -630,12 +642,20 @@ func internalError(err error) *dbxpluginsdk.PluginError {
 }
 
 func main() {
-	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.29", Capabilities: []string{}}
+	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.33", Capabilities: []string{}}
 	store, err := newDraftStore()
 	if err != nil {
 		log.Fatal(err)
 	}
-	server := dbxpluginsdk.NewServer(metadata, &plugin{workspaces: make(map[string]workspaceScope), drafts: store})
+	instance := &plugin{workspaces: make(map[string]workspaceScope), drafts: store}
+	defer func() {
+		instance.mu.Lock()
+		defer instance.mu.Unlock()
+		for _, task := range instance.devTasks {
+			task.cancel()
+		}
+	}()
+	server := dbxpluginsdk.NewServer(metadata, instance)
 	if err := server.Serve(); err != nil {
 		log.Fatal(err)
 	}
