@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "io.github.yuwengueen.dbx-code-editor",
   "name": "Code Editor",
-  "version": "0.1.17",
+  "version": "0.1.28",
   "publisher": "yuwengueen",
   "description": "A lightweight local project code editor inside DBX.",
   "icon": "assets/plugin.svg",
@@ -13,7 +13,7 @@
     "dbx": ">=0.6.0",
     "host_api": "1"
   },
-  "permissions": ["host.storage"],
+  "permissions": ["host.storage", "host.ai"],
   "entrypoints": {
     "backend": {
       "protocol_versions": [1],

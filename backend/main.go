@@ -72,6 +72,14 @@ type entry struct {
 
 func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params json.RawMessage, _ *dbxpluginsdk.Emitter) (any, *dbxpluginsdk.PluginError) {
 	switch method {
+	case "git/info":
+		return p.gitInfo(params)
+	case "git/action":
+		return p.gitMutate(params)
+	case "git/status":
+		return p.gitStatus(params)
+	case "git/diff":
+		return p.gitDiff(params)
 	case "word/import":
 		return p.pickOnce(p.importWord)
 	case "draft/image":
@@ -622,7 +630,7 @@ func internalError(err error) *dbxpluginsdk.PluginError {
 }
 
 func main() {
-	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.17", Capabilities: []string{}}
+	metadata := dbxpluginsdk.Metadata{ID: "io.github.yuwengueen.dbx-code-editor", Version: "0.1.28", Capabilities: []string{}}
 	store, err := newDraftStore()
 	if err != nil {
 		log.Fatal(err)

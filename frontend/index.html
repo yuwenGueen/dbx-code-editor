@@ -136,32 +136,12 @@
           </div>
           <div class="welcome" id="welcome">
             <div class="welcome-content">
-              <div class="welcome-intro">
-                <div class="welcome-mark" aria-hidden="true">&lt;/&gt;</div>
-                <p class="welcome-kicker">Code Editor</p>
-                <h1 id="welcome-title">Every file you open is a chance to make it better.</h1>
-                <p id="welcome-description">Open a project folder to browse, create and edit files.</p>
+              <h1 id="welcome-title">Every file, a little better.</h1>
+              <div class="welcome-actions">
+                <button class="welcome-action" id="welcome-new" type="button"><span data-i18n="newTemporaryFile">New temporary file</span><kbd class="mod-shortcut">⌘ ⌥ N</kbd></button>
+                <button class="welcome-action" id="welcome-open-file" type="button"><span data-i18n="openFile">Open file</span><kbd class="mod-shortcut">⌘ O</kbd></button>
+                <button class="welcome-action" id="welcome-commands" type="button"><span data-i18n="commandPalette">Command palette</span><kbd class="mod-shortcut">⌘ ⇧ P</kbd></button>
               </div>
-              <div class="welcome-launch">
-                <div class="welcome-section-heading" data-i18n="quickActions">Quick actions</div>
-                <div class="welcome-actions">
-                  <button class="welcome-action" id="welcome-new" type="button"><span class="welcome-action-icon" aria-hidden="true">＋</span><span data-i18n="newTemporaryFile">New temporary file</span><kbd class="mod-shortcut">⌘ ⌥ N</kbd></button>
-                  <button class="welcome-action" id="welcome-open" type="button"><span class="welcome-action-icon" aria-hidden="true">▱</span><span id="welcome-open-label">Open folder</span></button>
-                  <button class="welcome-action" id="welcome-open-file" type="button"><span class="welcome-action-icon" aria-hidden="true">≡</span><span data-i18n="openFile">Open file</span><kbd class="mod-shortcut">⌘ O</kbd></button>
-                  <button class="welcome-action" id="welcome-import-word" type="button"><span class="welcome-action-icon" aria-hidden="true">W</span><span data-i18n="importWord">Import Word as Markdown…</span></button>
-                  <button class="welcome-action" id="welcome-language" type="button"><span class="welcome-action-icon welcome-action-icon-code" aria-hidden="true">{}</span><span data-i18n="chooseLanguageNew">New file with language</span></button>
-                  <button class="welcome-action" id="welcome-commands" type="button"><span class="welcome-action-icon" aria-hidden="true">☷</span><span data-i18n="commandPalette">Command palette</span><kbd class="mod-shortcut">⌘ ⇧ P</kbd></button>
-                </div>
-                <div class="welcome-recent" id="welcome-recent" hidden>
-                  <span data-i18n="recentFolders">Recent folders</span>
-                  <div id="recent-folders"></div>
-                </div>
-                <div class="welcome-recent" id="welcome-recent-files" hidden>
-                  <span data-i18n="recentFiles">Recent files</span>
-                  <div id="recent-files"></div>
-                </div>
-              </div>
-              <p class="welcome-tip" data-i18n="welcomeTip">Double-click empty space to create a temporary file.</p>
             </div>
           </div>
           <section class="bottom-panel" id="bottom-panel" aria-label="Bottom panel" hidden>

@@ -1,5 +1,143 @@
 # 更新日志 / Changelog
 
+## v0.1.28 · 2026-09-29
+
+### 中文
+
+- 再次点击 AI 按钮即可折叠模型选择面板，保留已保存的供应商和模型。
+
+### English
+
+- Click the AI button again to collapse the model picker, preserving saved provider and model preferences.
+
+## v0.1.27 · 2026-09-29
+
+### 中文
+
+- 记住 Git AI 上次选择的供应商和各供应商的模型，重开插件后自动恢复。
+
+### English
+
+- Remember the last Git AI provider and each provider’s model across plugin restarts.
+
+## v0.1.26 · 2026-09-29
+
+### 中文
+
+- 支持在插件内选择 AI 供应商并动态获取模型列表，也可直接输入模型 ID，无需修改 DBX 默认模型。
+
+### English
+
+- Select an AI provider and fetch models inside the plugin, or enter a model ID without changing the DBX default.
+
+## v0.1.25 · 2026-09-29
+
+### 中文
+
+- 支持在配套新版 DBX 中选择宿主已配置的 API 模型，生成并回填提交说明，无需重复配置密钥。
+- 旧版宿主继续使用 AI 对话；生成期间编辑的提交草稿不会被覆盖。
+
+### English
+
+- Select configured host API models and fill generated commit messages with the companion DBX update, without duplicating credentials.
+- Older hosts retain AI chat; edits made while generation runs are preserved.
+
+## v0.1.24 · 2026-09-29
+
+### 中文
+
+- 提交按钮旁显示不可提交的原因，未暂存时提供全部暂存入口，保留提交说明。
+- 左右差异支持横向和纵向同步滚动，两侧统一滚动宽度。
+
+### English
+
+- Explain disabled commits inline and offer Stage all when nothing is staged, preserving the commit message.
+- Synchronize horizontal and vertical diff scrolling with equal content widths.
+
+## v0.1.23 · 2026-09-29
+
+### 中文
+
+- 图标按钮增加插件内悬停和键盘聚焦提示，解释 Git 与 AI 操作、前置条件及影响。
+- 支持从当前提交新建并切换本地分支，校验分支名、重名和未提交更改。
+
+### English
+
+- Add in-plugin hover and keyboard-focus tooltips explaining Git and AI actions, prerequisites, and effects.
+- Create and switch to a local branch at the current commit, with name, duplicate, and uncommitted-change validation.
+
+## v0.1.22 · 2026-09-29
+
+### 中文
+
+- 修复宿主 body 文字颜色覆盖插件暗色主题，导致差异普通行、活动标签和提交历史显示黑字的问题。
+- AI 提交说明优先使用已暂存更改，没有暂存内容时使用工作区磁盘更改，并显示准备状态。
+
+### English
+
+- Isolate the editor foreground from the host body color to fix dark-mode diff context, active tabs, and history text.
+- AI commit drafts use staged changes when available and otherwise changes on disk, with visible preparation feedback.
+
+## v0.1.21 · 2026-09-29
+
+### 中文
+
+- 修复 macOS 翻译执行环境与 ARM 命令行工具不兼容导致的 Git 失败：直接调用开发工具中的 Git，绕过 xcrun 启动器。
+
+### English
+
+- Fix Git failures with translated macOS processes and ARM-only developer tools by invoking developer Git directly instead of the xcrun shim.
+
+## v0.1.20 · 2026-09-29
+
+### 中文
+
+- 提升暗色模式文本选区对比度，并统一 WebKit 原生控件的文字颜色。
+- Git 错误区分进程启动失败、退出错误和输出超限，展示脱敏后的具体原因。
+
+### English
+
+- Improve dark-mode selection contrast and WebKit native control foreground colors.
+- Distinguish Git startup failures, exit errors, and output limits, with sanitized process diagnostics.
+
+## v0.1.19 · 2026-09-29
+
+### 中文
+
+- Git 状态读取失败时显示实际错误，便于诊断安装版与开发预览之间的差异。
+
+### English
+
+- Show the actual Git status error to diagnose differences between installed and development environments.
+
+## v0.1.18 · 2026-09-29
+
+### 中文
+
+- 新增获取、仅快进拉取、推送、同步、提交并推送，以及本地分支切换和最近提交历史；远程操作使用已配置的上游和 Git 凭据。
+- AI 提交说明复用 DBX 宿主 AI 对话和模型配置，发送前可检查暂存差异；当前宿主不支持自动回填，开发预览不调用模型。
+- 空白编辑区精简为一句 slogan 和新建文件、打开文件、命令面板三个快捷入口。
+- 统一源代码管理与编辑器的标题、图标、按钮、菜单、输入框和文件行样式，支持菜单键盘导航。
+- 源代码管理新增文件暂存/取消暂存、全部暂存/取消暂存、提交说明与本地提交，支持快捷键提交；保留 Git hooks 和签名配置，外部暂存区变更时要求刷新。
+- Git 差异改为左右双列：左侧修改前、右侧修改后，保留行号、增删高亮和同步垂直滚动，仅显示修改段落及附近上下文。
+- 新增左侧竖向活动栏，通过文件和源代码管理图标切换面板，Git 图标显示更改数量。
+- Git 更改移入左侧源代码管理面板，差异以主编辑区的只读标签页打开，可与普通文件切换；再次点击修改文件可刷新差异。
+- 新增 Git 查看：打开仓库根目录后显示当前分支、修改数量及文件状态；区分已暂存与未暂存更改，支持差异预览、手动刷新和每 10 秒自动刷新。
+- Git 查看需要本机安装 Git；首版支持普通仓库根目录，暂不支持链接 worktree、嵌套仓库扫描。
+
+### English
+
+- Added fetch, fast-forward pull, push, sync, commit and push, local branch switching, and recent history using the configured upstream and Git credentials.
+- Draft commit messages through the DBX host AI and existing model configuration, with staged changes reviewed before sending. Automatic result insertion is unavailable; dev preview does not run a model.
+- Simplified the empty editor to a slogan and shortcuts for a new file, opening a file, and the command palette.
+- Aligned Source Control headings, icons, buttons, menus, inputs, and file rows with the editor, including keyboard menu navigation.
+- Added stage/unstage, batch index actions, commit messages, and local commits with a keyboard shortcut. Git hooks and signing are respected; stale index state requires a refresh.
+- Git diffs now show before and after side by side, with aligned line numbers, change highlights, and synchronized vertical scrolling for changed hunks and surrounding context.
+- Added a vertical activity bar with Files and Source Control icons and a Git change-count badge.
+- Moved Git changes into the Source Control sidebar. Diffs open as read-only editor tabs alongside files; click a changed file again to refresh its diff.
+- Added Git inspection with branch and change counts, file status badges, staged and working-tree lists, diff previews, manual refresh, and automatic refresh every 10 seconds.
+- Requires local Git. This preview supports ordinary repository roots; linked worktrees, nested repository discovery are not supported.
+
 ## v0.1.17 · 2026-09-28
 
 ### 中文
